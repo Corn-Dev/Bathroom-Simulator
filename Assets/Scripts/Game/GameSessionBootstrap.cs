@@ -1,0 +1,22 @@
+using UnityEngine;
+
+public class GameSessionBootstrap : MonoBehaviour
+{
+    [SerializeField] private SteamLobby steamLobby;
+
+    private void OnEnable()
+    {
+        steamLobby.OnSessionReady += HandleSessionReady;
+    }
+
+    private void OnDisable()
+    {
+        steamLobby.OnSessionReady -= HandleSessionReady;
+    }
+
+    private void HandleSessionReady()
+    {
+        Debug.Log("Session ready — load fishing progress here.");
+        // FishingPlayerProgressService.Load(...) goes here when ready
+    }
+}

@@ -1,24 +1,32 @@
 using System;
-using UnityEngine;
+using System.Collections.Generic;
 using Steamworks;
 using Unity.Netcode;
-using UnityEngine.SceneManagement;
-using System.Collections.Generic;
+using UnityEngine;
 
 public class SteamLobby : MonoBehaviour
 {
-    // Callbacks
-    protected Callback<LobbyCreated_t> lobbyCreated;
-    protected Callback<GameLobbyJoinRequested_t> lobbyJoinRequested;
-    protected Callback<LobbyEnter_t> lobbyEntered;
-    protected Callback<LobbyChatUpdate_t> lobbyChatUpdate;
-
     public Action OnLobbyEnteredEvent;
     public event Action<List<(string playerName, Sprite avatar)>> OnLobbyPlayerListChanged;
+    public event Action<MultiplayerSessionState> OnSessionStateChanged;
+
+    [Header("Session Config")]
+    [SerializeField] private int maxPlayers = 8;
+    [SerializeField] private string gameplaySceneName = "Game Scene";
+
+    private MultiplayerSessionStateMachine stateMachine;
+    private SteamLobbyDiscoveryService discoveryService;
+    private SteamInviteService inviteService;
+    private NgoSessionCoordinator sessionCoordinator;
+    private CSteamID currentLobbyID = CSteamID.Nil;
+    public event Action OnSessionReady;
 
 
-    private const int maxPlayers = 8;
-    private CSteamID currentLobbyID;
+    private void Awake()
+    {
+        DontDestroyOnLoad(gameObject);
+        stateMachine = new MultiplayerSessionStateMachine();
+    }
 
     private void Start()
     {
@@ -28,22 +36,24 @@ public class SteamLobby : MonoBehaviour
             return;
         }
 
-        lobbyCreated = Callback<LobbyCreated_t>.Create(OnLobbyCreated);
-        lobbyJoinRequested = Callback<GameLobbyJoinRequested_t>.Create(OnGameLobbyJoinRequested);
-        lobbyEntered = Callback<LobbyEnter_t>.Create(OnLobbyEntered);
-        lobbyChatUpdate = Callback<LobbyChatUpdate_t>.Create(OnLobbyChatUpdate);
+        inviteService = new SteamInviteService();
+        sessionCoordinator = new NgoSessionCoordinator(NetworkManager.Singleton, stateMachine);
+        sessionCoordinator.SessionStateChanged += state => OnSessionStateChanged?.Invoke(state);
 
-    }
+        discoveryService = new SteamLobbyDiscoveryService(IsHost, GetSteamAvatar);
+        discoveryService.Initialize();
+        discoveryService.LobbyEntered += HandleLobbyEntered;
+        discoveryService.LobbyPlayerListChanged += players => OnLobbyPlayerListChanged?.Invoke(players);
 
-    private void Awake()
-    {
-        DontDestroyOnLoad(gameObject);
+        stateMachine.ForceState(MultiplayerSessionState.Idle);
+
     }
 
     // Host lobby
     public void HostLobby()
     {
-        SteamMatchmaking.CreateLobby(ELobbyType.k_ELobbyTypeFriendsOnly, maxPlayers);
+        stateMachine.TryTransition(MultiplayerSessionState.Discovering);
+        discoveryService.CreateFriendsLobby(maxPlayers);
     }
 
     public bool IsHost(CSteamID playerID)
@@ -71,39 +81,13 @@ public class SteamLobby : MonoBehaviour
     // Join via Steam overlay
     public void JoinFriendLobby()
     {
-        if (!SteamManager.Initialized) return;
-        SteamFriends.ActivateGameOverlay("Friends");
+        inviteService.OpenFriendsOverlay();
     }
 
-    private void OnLobbyChatUpdate(LobbyChatUpdate_t callback)
+    public void JoinRandomOpenLobby()
     {
-        if (callback.m_ulSteamIDLobby != currentLobbyID.m_SteamID) return;
-
-        // Update the UI
-        UpdateLobbyPlayerList();
-    }
-
-    //Hopefully remove logic from here
-    private void UpdateLobbyPlayerList()
-    {
-        int memberCount = SteamMatchmaking.GetNumLobbyMembers(currentLobbyID);
-        var players = new List<(string, Sprite)>();
-
-        for (int i = 0; i < memberCount; i++)
-        {
-            CSteamID memberID = SteamMatchmaking.GetLobbyMemberByIndex(currentLobbyID, i);
-            string playerName = SteamFriends.GetFriendPersonaName(memberID);
-            Sprite avatar = GetSteamAvatar(memberID);
-
-            if (IsHost(memberID))
-            {
-                playerName += " (host)";
-            }
-
-            players.Add((playerName, avatar));
-        }
-
-        OnLobbyPlayerListChanged?.Invoke(players);
+        stateMachine.TryTransition(MultiplayerSessionState.Discovering);
+        discoveryService.JoinRandomOpenLobby();
     }
 
     private Sprite GetSteamAvatar(CSteamID steamID)
@@ -135,66 +119,32 @@ public class SteamLobby : MonoBehaviour
         return Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f));
     }
 
-    // Lobby created
-    private void OnLobbyCreated(LobbyCreated_t callback)
+    private void HandleLobbyEntered(CSteamID lobbyId)
     {
-        if (callback.m_eResult != EResult.k_EResultOK)
+        currentLobbyID = lobbyId;
+        Debug.Log("Entered Lobby: " + currentLobbyID);
+
+        stateMachine.TryTransition(MultiplayerSessionState.Joining);
+        OnLobbyEnteredEvent?.Invoke();
+
+        string hostIDStr = SteamMatchmaking.GetLobbyData(currentLobbyID, "HostID");
+        if (!ulong.TryParse(hostIDStr, out ulong hostSteamId))
         {
-            Debug.LogError("Lobby creation failed: " + callback.m_eResult);
+            Debug.LogError("Invalid host steam ID in lobby data.");
+            stateMachine.ForceState(MultiplayerSessionState.Idle);
             return;
         }
 
-        currentLobbyID = new CSteamID(callback.m_ulSteamIDLobby);
-        Debug.Log("Lobby created! ID: " + currentLobbyID);
-
-        // Store host info in lobby data
-        SteamMatchmaking.SetLobbyData(currentLobbyID, "HostID", SteamUser.GetSteamID().ToString());
-        SteamMatchmaking.SetLobbyData(currentLobbyID, "name", SteamFriends.GetPersonaName() + "'s Lobby");
-    }
-
-    // Friend invited / request to join
-    private void OnGameLobbyJoinRequested(GameLobbyJoinRequested_t callback)
-    {
-        Debug.Log("Join request from lobby: " + callback.m_steamIDLobby);
-        SteamMatchmaking.JoinLobby(callback.m_steamIDLobby);
-    }
-
-    // Lobby entered
-    private void OnLobbyEntered(LobbyEnter_t callback)
-    {
-
-        currentLobbyID = new CSteamID(callback.m_ulSteamIDLobby);
-        Debug.Log("Entered Lobby: " + currentLobbyID);
-
-        
-
-        string hostIDStr = SteamMatchmaking.GetLobbyData(currentLobbyID, "HostID");
-        CSteamID hostID = new CSteamID(ulong.Parse(hostIDStr));
-
-        var transport = NetworkManager.Singleton.GetComponent<Netcode.Transports.SteamNetworkingSocketsTransport>();
-
-        OnLobbyEnteredEvent?.Invoke();
-
-        UpdateLobbyPlayerList();
-
-        if (IsHost())
+        bool started = IsHost()
+            ? sessionCoordinator.StartHost()
+            : sessionCoordinator.StartClient(hostSteamId);
+        if (!started)
         {
-            Debug.Log("You are the HOST. NGO Host will start later when you press StartGame()");
-            NetworkManager.Singleton.StartHost();
-
-            // Host doesn’t need to set ConnectToSteamID
-            // TODO: Show "Start Game" button in UI
-        }
-        else
+            Debug.LogError("Failed to bootstrap NGO session.");
+            stateMachine.ForceState(MultiplayerSessionState.Idle);
+        }else 
         {
-            Debug.Log("You are a CLIENT. Starting NGO Client...");
-
-            // Assign host SteamID so client knows where to connect
-            transport.ConnectToSteamID = hostID.m_SteamID;
-
-            NetworkManager.Singleton.StartClient();
-
-            // TODO: Hide/disable "Start Game" button in UI
+                OnSessionReady?.Invoke();
         }
     }
 
@@ -206,9 +156,12 @@ public class SteamLobby : MonoBehaviour
             return;
         }
 
-        NetworkManager.Singleton.Shutdown();
+        stateMachine.TryTransition(MultiplayerSessionState.Leaving);
+        CSteamID leavingLobbyId = currentLobbyID;
+        sessionCoordinator.ShutdownSession();
+        discoveryService.LeaveLobby(leavingLobbyId);
         currentLobbyID = CSteamID.Nil;
-        SteamMatchmaking.LeaveLobby(currentLobbyID);
+        stateMachine.ForceState(MultiplayerSessionState.Idle);
     }
 
     // Host starts the game once enough players have joined
@@ -221,7 +174,6 @@ public class SteamLobby : MonoBehaviour
         }
 
         // Only the host can start the game
-        string hostIDStr = SteamMatchmaking.GetLobbyData(currentLobbyID, "HostID");
         if (!IsHost())
         {
             Debug.LogWarning("Only the host can start the game!");
@@ -238,12 +190,11 @@ public class SteamLobby : MonoBehaviour
         Debug.Log("Starting game... Loading GameScene for all players.");
 
         // Host loads the GameScene; NGO handles scene sync
-        NetworkManager.Singleton.SceneManager.LoadScene("Game Scene", LoadSceneMode.Single);
+        sessionCoordinator.LoadGameplayScene(gameplaySceneName);
     }
 
     public CSteamID GetLobbyId()
     {
-
         return currentLobbyID;
     }
 }

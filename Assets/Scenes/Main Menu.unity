@@ -2247,6 +2247,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0b53c20f02479e54b991de7bb776358b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  useLobbyUi: 0
+  preferRandomOpenLobbies: 1
   mainMenuPanel: {fileID: 1959707124}
   playPanel: {fileID: 71156434}
   lobbyPanel: {fileID: 164086077}
@@ -3461,7 +3463,7 @@ MonoBehaviour:
   NetworkConfig:
     ProtocolVersion: 0
     NetworkTransport: {fileID: 1001028450}
-    PlayerPrefab: {fileID: 5212262462873640152, guid: 908597b0ce89b3f42a652ec197eac57d, type: 3}
+    PlayerPrefab: {fileID: 0}
     Prefabs:
       NetworkPrefabsLists:
       - {fileID: 11400000, guid: 28ac57ce275dcbd4bacd68c4497c0818, type: 2}
@@ -5592,6 +5594,8 @@ GameObject:
   m_Component:
   - component: {fileID: 1790237623}
   - component: {fileID: 1790237622}
+  - component: {fileID: 1790237625}
+  - component: {fileID: 1790237624}
   m_Layer: 0
   m_Name: SteamLobby
   m_TagString: Untagged
@@ -5611,6 +5615,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8811133dbe25a804aa9ccc5e43893e13, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  maxPlayers: 8
+  gameplaySceneName: Game Scene
 --- !u!4 &1790237623
 Transform:
   m_ObjectHideFlags: 0
@@ -5626,6 +5632,32 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1790237624
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1790237621}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f07977be701ef3f4c8be87f25dfe06a7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  mainMenuSceneName: Main Menu
+--- !u!114 &1790237625
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1790237621}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e3b5ab9c17aeb8c4dbb1e6d06fb6345d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  steamLobby: {fileID: 0}
 --- !u!1 &1959707124
 GameObject:
   m_ObjectHideFlags: 0

@@ -1,0 +1,21 @@
+{
+  "name": "Phish.EditModeTests",
+  "rootNamespace": "",
+  "references": [
+    "Phish.Multiplayer.SessionState"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false,
+  "optionalUnityReferences": [
+    "TestAssemblies"
+  ]
+}
