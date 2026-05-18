@@ -16,10 +16,8 @@ public class MultiplayerSampleBootstrap : MonoBehaviour
 
     public void QuickJoinOpenLobby()
     {
-        if (steamLobby != null)
-        {
-            steamLobby.JoinRandomOpenLobby();
-        }
+        // TODO: Implement lobby browser UI. For now, joining happens via Steam overlay.
+        Debug.LogWarning("[MultiplayerSampleBootstrap] QuickJoinOpenLobby is not implemented — use the Steam overlay to join.");
     }
 
     public void OpenFriendInviteJoin()

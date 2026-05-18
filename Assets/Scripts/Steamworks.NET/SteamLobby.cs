@@ -11,7 +11,6 @@ public class SteamLobby : MonoBehaviour
     public event Action<MultiplayerSessionState> OnSessionStateChanged;
 
     [Header("Session Config")]
-    [SerializeField] private int maxPlayers = 8;
     [SerializeField] private string gameplaySceneName = "Game Scene";
 
     private MultiplayerSessionStateMachine stateMachine;
@@ -19,6 +18,7 @@ public class SteamLobby : MonoBehaviour
     private SteamInviteService inviteService;
     private NgoSessionCoordinator sessionCoordinator;
     private CSteamID currentLobbyID = CSteamID.Nil;
+    public event Action OnHostLobbyRequested;
     public event Action OnSessionReady;
 
 
@@ -49,11 +49,27 @@ public class SteamLobby : MonoBehaviour
 
     }
 
-    // Host lobby
+    // Signals intent to host. Callers (e.g. MainMenuUI) should listen to
+    // OnHostLobbyRequested and show host-settings UI, then call StartGame().
     public void HostLobby()
     {
+        OnHostLobbyRequested?.Invoke();
+    }
+
+    // Creates the Steam lobby with the given settings and loads the game scene
+    // once the lobby is entered. Lobby creation triggers HandleLobbyEntered which
+    // starts NGO host/client as normal.
+    public void StartGame(int maxPlayers, bool friendsOnly)
+    {
         stateMachine.TryTransition(MultiplayerSessionState.Discovering);
-        discoveryService.CreateFriendsLobby(maxPlayers);
+        if (friendsOnly)
+        {
+            discoveryService.CreateFriendsLobby(maxPlayers);
+        }
+        else
+        {
+            discoveryService.CreateOpenLobby(maxPlayers);
+        }
     }
 
     public bool IsHost(CSteamID playerID)
@@ -78,16 +94,11 @@ public class SteamLobby : MonoBehaviour
         return localID == hostID;
     }
 
-    // Join via Steam overlay
+    // Join via Steam overlay — player uses "Join Game" on friend's profile to connect.
+    // TODO: Add lobby browser (friends' games + public lobbies) when UI is ready.
     public void JoinFriendLobby()
     {
         inviteService.OpenFriendsOverlay();
-    }
-
-    public void JoinRandomOpenLobby()
-    {
-        stateMachine.TryTransition(MultiplayerSessionState.Discovering);
-        discoveryService.JoinRandomOpenLobby();
     }
 
     private Sprite GetSteamAvatar(CSteamID steamID)
@@ -127,24 +138,30 @@ public class SteamLobby : MonoBehaviour
         stateMachine.TryTransition(MultiplayerSessionState.Joining);
         OnLobbyEnteredEvent?.Invoke();
 
-        string hostIDStr = SteamMatchmaking.GetLobbyData(currentLobbyID, "HostID");
-        if (!ulong.TryParse(hostIDStr, out ulong hostSteamId))
+        // Use GetLobbyOwner rather than reading the "HostID" lobby data key.
+        // Lobby data propagation is asynchronous and the key may not have arrived
+        // on the joiner by the time LobbyEnter_t fires.
+        CSteamID hostSteamID = SteamMatchmaking.GetLobbyOwner(currentLobbyID);
+        if (hostSteamID == CSteamID.Nil || !hostSteamID.IsValid())
         {
-            Debug.LogError("Invalid host steam ID in lobby data.");
+            Debug.LogError("Could not determine lobby owner — lobby may not be fully initialised.");
             stateMachine.ForceState(MultiplayerSessionState.Idle);
             return;
         }
 
         bool started = IsHost()
             ? sessionCoordinator.StartHost()
-            : sessionCoordinator.StartClient(hostSteamId);
+            : sessionCoordinator.StartClient(hostSteamID.m_SteamID);
         if (!started)
         {
             Debug.LogError("Failed to bootstrap NGO session.");
             stateMachine.ForceState(MultiplayerSessionState.Idle);
-        }else 
+        }
+        else
         {
-                OnSessionReady?.Invoke();
+            OnSessionReady?.Invoke();
+            if (IsHost())
+                sessionCoordinator.LoadGameplayScene(gameplaySceneName);
         }
     }
 
@@ -162,35 +179,6 @@ public class SteamLobby : MonoBehaviour
         discoveryService.LeaveLobby(leavingLobbyId);
         currentLobbyID = CSteamID.Nil;
         stateMachine.ForceState(MultiplayerSessionState.Idle);
-    }
-
-    // Host starts the game once enough players have joined
-    public void StartGame()
-    {
-        if (currentLobbyID == CSteamID.Nil)
-        {
-            Debug.LogError("No active lobby to start!");
-            return;
-        }
-
-        // Only the host can start the game
-        if (!IsHost())
-        {
-            Debug.LogWarning("Only the host can start the game!");
-            return;
-        }
-
-        int memberCount = SteamMatchmaking.GetNumLobbyMembers(currentLobbyID);
-        if (memberCount < 1)
-        {
-            Debug.Log("Not enough players to start!");
-            return;
-        }
-
-        Debug.Log("Starting game... Loading GameScene for all players.");
-
-        // Host loads the GameScene; NGO handles scene sync
-        sessionCoordinator.LoadGameplayScene(gameplaySceneName);
     }
 
     public CSteamID GetLobbyId()

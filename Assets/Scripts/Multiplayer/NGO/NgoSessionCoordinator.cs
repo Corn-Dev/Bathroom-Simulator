@@ -65,12 +65,32 @@ public sealed class NgoSessionCoordinator : ISessionBootstrap
 
     public void LoadGameplayScene(string sceneName)
     {
-        if (networkManager == null || networkManager.SceneManager == null)
+        if (networkManager == null)
         {
+            Debug.LogError("[NgoSessionCoordinator] NetworkManager is null — cannot load scene.");
             return;
         }
 
-        networkManager.SceneManager.LoadScene(sceneName, LoadSceneMode.Single);
+        if (!networkManager.IsServer)
+        {
+            Debug.LogError("[NgoSessionCoordinator] LoadGameplayScene called on a non-server — only the host should call this.");
+            return;
+        }
+
+        if (networkManager.SceneManager == null)
+        {
+            Debug.LogError("[NgoSessionCoordinator] NetworkManager.SceneManager is null — ensure 'Enable Scene Management' is checked on the NetworkManager component.");
+            return;
+        }
+
+        Debug.Log($"[NgoSessionCoordinator] Loading scene '{sceneName}' via NGO SceneManager.");
+        var status = networkManager.SceneManager.LoadScene(sceneName, LoadSceneMode.Single);
+        if (status != SceneEventProgressStatus.Started)
+        {
+            Debug.LogError($"[NgoSessionCoordinator] SceneManager.LoadScene returned {status}. Check that '{sceneName}' is added to the NetworkManager's scene list and that scene management is enabled.");
+            return;
+        }
+
         SetState(MultiplayerSessionState.InSession);
     }
 

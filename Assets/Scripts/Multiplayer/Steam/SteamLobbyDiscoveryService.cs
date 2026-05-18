@@ -43,6 +43,11 @@ public sealed class SteamLobbyDiscoveryService : IMatchDiscovery
         SteamMatchmaking.CreateLobby(ELobbyType.k_ELobbyTypeFriendsOnly, maxPlayers);
     }
 
+    public void CreateOpenLobby(int maxPlayers)
+    {
+        SteamMatchmaking.CreateLobby(ELobbyType.k_ELobbyTypePublic, maxPlayers);
+    }
+
     public void JoinLobby(CSteamID lobbyId)
     {
         SteamMatchmaking.JoinLobby(lobbyId);

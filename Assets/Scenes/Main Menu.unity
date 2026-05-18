@@ -2248,7 +2248,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   useLobbyUi: 0
-  preferRandomOpenLobbies: 1
   mainMenuPanel: {fileID: 1959707124}
   playPanel: {fileID: 71156434}
   lobbyPanel: {fileID: 164086077}
@@ -2261,6 +2260,8 @@ MonoBehaviour:
   backFromPlayButton: {fileID: 484622890}
   backFromLobbyButton: {fileID: 430596248}
   startGameButton: {fileID: 31766259}
+  defaultMaxPlayers: 8
+  defaultFriendsOnly: 1
   steamLobby: {fileID: 1790237622}
 --- !u!1 &523004734
 GameObject:
@@ -5615,7 +5616,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8811133dbe25a804aa9ccc5e43893e13, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  maxPlayers: 8
   gameplaySceneName: Game Scene
 --- !u!4 &1790237623
 Transform:
@@ -5657,7 +5657,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e3b5ab9c17aeb8c4dbb1e6d06fb6345d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  steamLobby: {fileID: 0}
+  steamLobby: {fileID: 1790237622}
 --- !u!1 &1959707124
 GameObject:
   m_ObjectHideFlags: 0

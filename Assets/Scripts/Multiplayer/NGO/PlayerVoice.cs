@@ -68,7 +68,10 @@ public class PlayerVoice : NetworkBehaviour
 
         if (result != EVoiceResult.k_EVoiceResultOK)
         {
-            Debug.LogWarning($"[VOICE] GetAvailableVoice failed: {result}");
+            if (verboseLogs)
+            {
+                Debug.LogWarning($"[VOICE] GetAvailableVoice failed: {result}");
+            }
             return;
         }
 

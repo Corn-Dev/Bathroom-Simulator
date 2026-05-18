@@ -50,22 +50,10 @@ public class ConnectionHandler : MonoBehaviour
             return;
         }
 
-        if (NetworkManager.Singleton.IsServer)
-        {
-            if (NetworkManager.Singleton.ConnectedClients.TryGetValue(clientId, out var clientData))
-            {
-                var playerObject = clientData.PlayerObject;
-                if (playerObject != null && playerObject.IsSpawned)
-                {
-                    playerObject.Despawn(true);
-                }
-            }
+        // Player object despawn is handled by SpawnManager.
 
-            // TODO: Optionally broadcast to remaining players (chat/log UI)
-        }
-
-        // If the host disconnects, everyone gets kicked � 
-        // you can detect this on clients and bounce them to main menu:
+        // If the host disconnects, everyone gets kicked —
+        // detect this on clients and bounce them to main menu.
         if (!NetworkManager.Singleton.IsServer && clientId == NetworkManager.ServerClientId)
         {
             Debug.Log("Host disconnected! Returning to main menu...");

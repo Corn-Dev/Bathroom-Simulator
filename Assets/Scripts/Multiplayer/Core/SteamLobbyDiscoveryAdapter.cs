@@ -36,7 +36,8 @@ public sealed class SteamLobbyDiscoveryAdapter : IMatchDiscovery
 
     public void JoinRandomOpenLobby()
     {
-        steamLobby?.JoinRandomOpenLobby();
+        // TODO: Implement lobby browser UI. For now, joining happens via Steam overlay.
+        // SteamLobby.JoinRandomOpenLobby has been removed pending proper lobby browser implementation.
     }
 
     public void LeaveLobby(CSteamID lobbyId)
