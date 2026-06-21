@@ -124,6 +124,7 @@ GameObject:
   - component: {fileID: 3951636617747812463}
   - component: {fileID: -1237181299852699352}
   - component: {fileID: 2518215590726320509}
+  - component: {fileID: -5201172066225747961}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -254,8 +255,17 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: baee6c8164ca0fb4a9666f3bef1c273a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  speed: 5
-  rotationSpeed: 200
+  moveSpeed: 5
+  jumpForce: 5
+  groundDrag: 6
+  airDrag: 1
+  mouseSensitivity: 2
+  maxPitchAngle: 80
+  groundCheckDistance: 0.1
+  groundLayer:
+    serializedVersion: 2
+    m_Bits: 1
+  cameraTransform: {fileID: 0}
 --- !u!114 &1356232851254741781
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -293,8 +303,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4d46ec585e1e7514ea28e5b8cc19ef4e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  reconciliationThreshold: 0.15
-  speed: 5
+  syncInterval: 0.05
 --- !u!114 &-1237181299852699352
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -319,6 +328,33 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ae34a2b5dc2b11c4884643a0f4f6ef1a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+--- !u!54 &-5201172066225747961
+Rigidbody:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5212262462873640152}
+  serializedVersion: 4
+  m_Mass: 1
+  m_Drag: 0
+  m_AngularDrag: 0.05
+  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_InertiaTensor: {x: 1, y: 1, z: 1}
+  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ImplicitCom: 1
+  m_ImplicitTensor: 1
+  m_UseGravity: 1
+  m_IsKinematic: 0
+  m_Interpolate: 0
+  m_Constraints: 80
+  m_CollisionDetection: 0
 --- !u!1 &6913360529194134390
 GameObject:
   m_ObjectHideFlags: 0

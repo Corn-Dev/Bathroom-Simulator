@@ -57,6 +57,14 @@ public class ConnectionHandler : MonoBehaviour
         if (!NetworkManager.Singleton.IsServer && clientId == NetworkManager.ServerClientId)
         {
             Debug.Log("Host disconnected! Returning to main menu...");
+
+            // Clean up Steam lobby state before returning to main menu
+            var steamLobby = UnityEngine.Object.FindFirstObjectByType<SteamLobby>();
+            if (steamLobby != null)
+                steamLobby.LeaveLobby();
+            else
+                NetworkManager.Singleton.Shutdown();
+
             SceneManager.LoadScene(mainMenuSceneName);
         }
     }
