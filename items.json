@@ -1,0 +1,17 @@
+{
+  "appid": 4038220,
+  "items": [
+    {
+      "itemdefid": 1,
+      "type": "item",
+      "name": "Test Bluegill",
+      "description": "A common bluegill. Caught for testing purposes.",
+      "display_type": "Fish",
+      "tradable": true,
+      "marketable": false,
+      "stackable": true,
+      "background_color": "3C352E",
+      "name_color": "7EA650"
+    }
+  ]
+}
