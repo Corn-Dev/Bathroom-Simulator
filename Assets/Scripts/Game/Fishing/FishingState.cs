@@ -1,27 +1,32 @@
 /// <summary>
 /// States of the fishing flow.
-/// The fishing controller transitions through these sequentially.
 /// </summary>
 public enum FishingState
 {
-    /// <summary>Player is not fishing — can move freely, open menus, etc.</summary>
+    /// <summary>Player is not fishing — can move freely.</summary>
     Idle,
 
-    /// <summary>Player is performing the cast animation/action.</summary>
-    Casting,
+    /// <summary>Player is holding to charge cast power. Bar bounces up then down.</summary>
+    Charging,
 
-    /// <summary>Line is in the water, waiting for a fish to bite.</summary>
+    /// <summary>Bobber is flying through the air in an arc.</summary>
+    CastFlying,
+
+    /// <summary>Bobber landed on water, waiting for a fish to bite.</summary>
     WaitingForBite,
 
-    /// <summary>A fish is on the line — player must react within a window to start reeling.</summary>
+    /// <summary>A fish is on the line — player must react within a window.</summary>
     Biting,
 
     /// <summary>Player is actively reeling — minigame in progress.</summary>
     Reeling,
 
-    /// <summary>Fish was successfully caught — showing result.</summary>
+    /// <summary>Fish was successfully caught.</summary>
     CatchSuccess,
 
-    /// <summary>Fish got away — line snapped or player failed the minigame.</summary>
-    CatchFailed
+    /// <summary>Fish got away or cast failed.</summary>
+    CatchFailed,
+
+    /// <summary>Bobber hooked another player — reeling them in.</summary>
+    HookedPlayer
 }

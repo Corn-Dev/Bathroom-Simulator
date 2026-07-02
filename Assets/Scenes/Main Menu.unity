@@ -2320,7 +2320,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: MAIN MENU
+  m_text: PHISH
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 4897d56c80b53f54fbf736688056abcf, type: 2}
   m_sharedMaterial: {fileID: 4476852679393013672, guid: 4897d56c80b53f54fbf736688056abcf, type: 2}
@@ -2763,7 +2763,7 @@ Light:
   serializedVersion: 10
   m_Type: 1
   m_Shape: 0
-  m_Color: {r: 0.6698113, g: 0.23134086, b: 0.16745283, a: 1}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_Intensity: 1
   m_Range: 10
   m_SpotAngle: 30

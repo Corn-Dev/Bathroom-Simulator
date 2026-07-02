@@ -1,0 +1,28 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 45b93a8ca7a249441be304da95edc1bf, type: 3}
+  m_Name: Golden Koi
+  m_EditorClassIdentifier: 
+  fishId: golden_koi
+  displayName: Golden Koi
+  description: An extremely rare golden fish. Legend says it brings good fortune.
+  rarity: 4
+  dropWeight: 1
+  biteTimeRange: {x: 6, y: 12}
+  reelDifficulty: 0.85
+  baseHealth: 20
+  baseAttack: 8
+  baseSpeed: 6
+  icon: {fileID: 21300000, guid: b6c8043e5c4793a42b1c681e430cd436, type: 3}
+  silhouette: {fileID: 21300000, guid: 01a000dae79135d4fbfe48b4a4a11424, type: 3}
+  rarityColor: {r: 1, g: 1, b: 1, a: 1}
+  steamItemDefId: 5

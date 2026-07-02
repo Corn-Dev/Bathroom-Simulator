@@ -33,10 +33,17 @@ public class EnableCamera : NetworkBehaviour
         {
             // Enable only for the local player
             playerCamera.enabled = true;
+            playerCamera.tag = "MainCamera";
             if (playerAudioListener != null)
             {
                 playerAudioListener.enabled = true;
             }
+        }
+        else if (playerCamera != null)
+        {
+            // Non-owner: ensure camera is disabled and untagged
+            playerCamera.enabled = false;
+            playerCamera.tag = "Untagged";
         }
     }
 }

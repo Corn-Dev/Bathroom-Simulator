@@ -14,7 +14,7 @@ public class FishingRodData : ScriptableObject
     [TextArea] public string description;
 
     [Header("Stats")]
-    [Tooltip("Maximum cast distance in world units.")]
+    [Tooltip("Maximum cast distance in world units at full power.")]
     public float castRange = 10f;
 
     [Tooltip("Multiplier on reel-in speed. Higher = easier reeling.")]
@@ -25,6 +25,9 @@ public class FishingRodData : ScriptableObject
 
     [Tooltip("Multiplier on bite wait time. Lower = fish bite sooner.")]
     [Range(0.5f, 2f)] public float biteTimeMultiplier = 1f;
+
+    [Tooltip("How fast the cast power bar fills/drains per second. Higher = harder timing.")]
+    public float castBarSpeed = 1.2f;
 
     [Header("Visuals")]
     public Sprite icon;
