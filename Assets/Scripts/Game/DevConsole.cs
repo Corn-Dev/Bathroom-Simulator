@@ -218,7 +218,7 @@ public class DevConsole : MonoBehaviour
         switch (command.ToLower())
         {
             case "help":
-                Debug.Log("Commands: help, clear, fps, state, clearinventory, resetdex");
+                Debug.Log("Commands: help, clear, fps, state, resetsave");
                 break;
             case "clear":
                 logEntries.Clear();
@@ -237,9 +237,16 @@ public class DevConsole : MonoBehaviour
                 ClearSteamInventory();
                 break;
             case "resetdex":
-                UnityEngine.PlayerPrefs.DeleteKey("Fishdex_Caught");
-                UnityEngine.PlayerPrefs.Save();
-                Debug.Log("Fishdex reset — all species marked uncaught.");
+            case "resetsave":
+                if (SaveManager.Instance != null)
+                {
+                    SaveManager.Instance.ResetSave();
+                    Debug.Log("Save data reset.");
+                }
+                else
+                {
+                    Debug.Log("SaveManager not found.");
+                }
                 break;
             default:
                 Debug.Log($"Unknown command: {command}");

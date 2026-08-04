@@ -398,7 +398,7 @@ public class FishingController : NetworkBehaviour
             onResult: result =>
             {
                 LastCatchResult = result;
-                Debug.Log($"[Fishing] Caught: {result.fish.displayName} ({result.fish.rarity}){(result.isNewSpecies ? " — NEW SPECIES!" : "")}");
+                Debug.Log($"[Fishing] Caught: {result.fish.displayName} ({result.fish.rarity}) — {result.size}kg{(result.isNewSpecies ? " — NEW SPECIES!" : "")}{(result.isPersonalBest ? " — NEW PB!" : "")}");
                 OnFishCaught?.Invoke(result);
                 TransitionTo(FishingState.CatchSuccess);
             },

@@ -27,5 +27,7 @@ public interface IFishingBackend
 public struct CatchResult
 {
     public FishSpeciesData fish;
-    public bool isNewSpecies;   // First time catching this species — Fishdex reveal
+    public bool isNewSpecies;
+    public float size;
+    public bool isPersonalBest;
 }

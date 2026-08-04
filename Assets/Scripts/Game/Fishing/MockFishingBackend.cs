@@ -1,33 +1,18 @@
 using System;
-using System.Collections.Generic;
-using Steamworks;
 using UnityEngine;
 
 /// <summary>
-/// Development/testing backend that runs entirely client-side.
-/// Rolls fish from a weighted table and grants via Steam Inventory client API.
-/// Replace with RemoteFishingBackend for production.
+/// Development backend that runs entirely client-side.
+/// Rolls fish from a weighted table, rolls a size, and saves to PlayerSaveData.
+/// No Steam Inventory grants — all data is in the save file.
 /// </summary>
 public class MockFishingBackend : IFishingBackend
 {
     private readonly FishSpeciesData[] allFish;
-    private readonly HashSet<string> caughtSpecies;
 
     public MockFishingBackend(FishSpeciesData[] allFish)
     {
         this.allFish = allFish;
-        caughtSpecies = new HashSet<string>();
-
-        // Load previously caught species from PlayerPrefs (dev persistence)
-        string saved = UnityEngine.PlayerPrefs.GetString("Fishdex_Caught", "");
-        if (!string.IsNullOrEmpty(saved))
-        {
-            foreach (string id in saved.Split(','))
-            {
-                if (!string.IsNullOrEmpty(id))
-                    caughtSpecies.Add(id);
-            }
-        }
     }
 
     public void RequestCatch(FishingContext context, Action<CatchResult> onResult, Action<string> onError)
@@ -35,6 +20,12 @@ public class MockFishingBackend : IFishingBackend
         if (allFish == null || allFish.Length == 0)
         {
             onError?.Invoke("No fish species configured.");
+            return;
+        }
+
+        if (SaveManager.Instance == null)
+        {
+            onError?.Invoke("SaveManager not initialized.");
             return;
         }
 
@@ -46,26 +37,26 @@ public class MockFishingBackend : IFishingBackend
             return;
         }
 
-        // Grant via Steam Inventory
-        bool grantSuccess = GrantFishToInventory(fish);
-        if (!grantSuccess)
-        {
-            onError?.Invoke("Steam Inventory grant failed.");
-            return;
-        }
+        // Roll size on a bell curve
+        float size = RollSize(fish);
 
-        // Check if this is a new species for the Fishdex
-        bool isNew = !caughtSpecies.Contains(fish.fishId);
-        if (isNew)
-        {
-            caughtSpecies.Add(fish.fishId);
-            SaveFishdex();
-        }
+        // Check if this is a new species
+        bool isNew = !SaveManager.Instance.Data.HasCaughtSpecies(fish.fishId);
+
+        // Check if this is a new personal best
+        float previousBest = SaveManager.Instance.Data.GetPersonalBest(fish.fishId);
+        bool isPersonalBest = size > previousBest;
+
+        // Register the catch in save data
+        SaveManager.Instance.Data.RegisterCatch(fish.fishId, size);
+        SaveManager.Instance.Save();
 
         onResult?.Invoke(new CatchResult
         {
             fish = fish,
-            isNewSpecies = isNew
+            isNewSpecies = isNew,
+            size = size,
+            isPersonalBest = isPersonalBest
         });
     }
 
@@ -78,7 +69,6 @@ public class MockFishingBackend : IFishingBackend
         {
             float weight = allFish[i].dropWeight;
 
-            // Rod rarity bonus: boost rare+ fish weights
             if (context.rod != null && allFish[i].rarity >= FishRarity.Rare)
             {
                 weight *= (1f + context.rod.rarityBonus * 10f);
@@ -95,60 +85,37 @@ public class MockFishingBackend : IFishingBackend
         {
             cumulative += weights[i];
             if (roll <= cumulative)
-            {
                 return allFish[i];
-            }
         }
 
         return allFish[allFish.Length - 1];
     }
 
-    private bool GrantFishToInventory(FishSpeciesData fish)
+    private float RollSize(FishSpeciesData fish)
     {
-        if (!SteamManager.Initialized)
-        {
-            Debug.LogWarning("[MockFishingBackend] Steam not initialized — skipping inventory grant.");
-            return true; // Still return true so the flow works in editor without Steam
-        }
+        // Bell curve centered on averageWeight, clamped to min/max
+        float mean = fish.averageWeight;
+        float stdDev = (fish.maxWeight - fish.minWeight) * 0.15f; // Most catches cluster near average
 
-        if (fish.steamItemDefId <= 0)
-        {
-            Debug.LogWarning($"[MockFishingBackend] Fish '{fish.displayName}' has no Steam item def ID — skipping grant.");
-            return true; // Allow flow to continue for fish without Steam integration
-        }
+        // Box-Muller transform for gaussian distribution
+        float u1 = UnityEngine.Random.Range(0.0001f, 1f);
+        float u2 = UnityEngine.Random.Range(0.0001f, 1f);
+        float gaussian = Mathf.Sqrt(-2f * Mathf.Log(u1)) * Mathf.Cos(2f * Mathf.PI * u2);
 
-        SteamItemDef_t[] itemDefs = new SteamItemDef_t[] { (SteamItemDef_t)fish.steamItemDefId };
-        uint[] quantities = new uint[] { 1 };
-
-        bool success = SteamInventory.GenerateItems(
-            out _,
-            itemDefs,
-            quantities,
-            (uint)itemDefs.Length
-        );
-
-        if (!success)
-        {
-            Debug.LogError($"[MockFishingBackend] GenerateItems failed for '{fish.displayName}' (defId: {fish.steamItemDefId})");
-        }
-
-        return success;
+        float size = mean + gaussian * stdDev;
+        size = Mathf.Clamp(size, fish.minWeight, fish.maxWeight);
+        return Mathf.Round(size * 10f) / 10f; // Round to 1 decimal
     }
 
-    /// <summary>
-    /// Check if a species has been caught before (for Fishdex display).
-    /// </summary>
-    public bool HasCaughtSpecies(string fishId) => caughtSpecies.Contains(fishId);
-
-    /// <summary>
-    /// Total number of unique species caught.
-    /// </summary>
-    public int GetCaughtCount() => caughtSpecies.Count;
-
-    private void SaveFishdex()
+    /// <summary>Check if a species has been caught (reads from save).</summary>
+    public bool HasCaughtSpecies(string fishId)
     {
-        string data = string.Join(",", caughtSpecies);
-        UnityEngine.PlayerPrefs.SetString("Fishdex_Caught", data);
-        UnityEngine.PlayerPrefs.Save();
+        return SaveManager.Instance != null && SaveManager.Instance.Data.HasCaughtSpecies(fishId);
+    }
+
+    /// <summary>Total unique species caught.</summary>
+    public int GetCaughtCount()
+    {
+        return SaveManager.Instance != null ? SaveManager.Instance.Data.GetCaughtCount() : 0;
     }
 }

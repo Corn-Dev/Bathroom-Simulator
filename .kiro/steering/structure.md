@@ -9,6 +9,7 @@ Assets/
 ├── Scripts/
 │   ├── Game/
 │   │   ├── GameSessionBootstrap.cs          # Wires SteamLobby.OnSessionReady to game init
+│   │   ├── ThirdPersonCamera.cs             # Orbit camera: mouse-look, zoom, collision avoidance
 │   │   └── Fishing/
 │   │       ├── FishingPlayerProgressService.cs   # IPlayerProgressService impl (PlayerPrefs stub)
 │   │       └── FishingProgressHandshake.cs       # NetworkBehaviour; gates gameplay via INetworkSpawnPolicy
@@ -44,13 +45,13 @@ Assets/
 ├── com.rlabrecque.steamworks.net/   # Steamworks.NET package (vendored)
 ├── TextMesh Pro/                    # TMP package assets
 │
-├── Player.prefab                    # Player prefab: NetworkMovementSync + PlayerMovement + NetworkVoiceRouter + PlayerVoice + FishingProgressHandshake
+├── Player.prefab                    # Player prefab: NetworkMovementSync + PlayerMovement + ThirdPersonCamera + NetworkVoiceRouter + PlayerVoice + FishingProgressHandshake
 ├── DontDestroyNetworkManager.cs     # Keeps NetworkManager alive across scene loads
 ├── ConnectionHandler.cs             # Handles NGO connect/disconnect callbacks; returns to main menu on host drop
 ├── MainMenuUI.cs                    # Main menu panel controller; wires buttons to SteamLobby
 ├── LobbyPlayerList.cs               # UI: manages up to 8 PlayerSlotUI slots
 ├── PlayerSlotUI.cs                  # UI: single player slot (name + avatar)
-├── PlayerMovement.cs                # Local input → NetworkMovementSync; respects INetworkSpawnPolicy
+├── PlayerMovement.cs                # Third-person local input → NetworkMovementSync; camera-relative movement, character rotates to face direction
 ├── PlayerVoice.cs                   # NetworkBehaviour; captures Steam voice, feeds circular buffer to AudioSource
 └── EnableCamera.cs
 ```

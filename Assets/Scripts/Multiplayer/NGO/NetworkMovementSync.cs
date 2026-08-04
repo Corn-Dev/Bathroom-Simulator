@@ -76,6 +76,7 @@ public class NetworkMovementSync : NetworkBehaviour
     public void SetRotation(Quaternion rotation)
     {
         if (!IsOwner) return;
+        rb.angularVelocity = Vector3.zero;
         rb.MoveRotation(rotation);
     }
 

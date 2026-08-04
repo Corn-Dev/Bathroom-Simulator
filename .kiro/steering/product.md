@@ -1,6 +1,6 @@
 # Product: Phish
 
-Phish is a multiplayer fishing game built in Unity where players catch creatures, build their operation, battle their catches against others, and participate in a real Steam-based economy. The tone is chaotic and social — think friend group slop game with meaningful progression and a real collectible economy underneath.
+Phish is a multiplayer fishing game built in Unity. Players cast, reel, and collect fish in a shared world — chasing bigger catches, rarer species, and better gear. The tone is relaxed and social — fish with friends or strangers, show off your records, and build your collection.
 
 > This vision is subject to change. Treat this as the current north star, not a locked spec.
 
@@ -8,198 +8,167 @@ Phish is a multiplayer fishing game built in Unity where players catch creatures
 
 ## Elevator Pitch
 
-"Catch rare creatures, level them up, and battle your friends — while they're trying to do the same thing to you."
+"Catch fish, chase records, unlock new waters. Every cast could be your biggest catch."
 
 ---
 
-## Core Pillars
+## Core MVP (the game needs ALL of this to ship)
 
-### 1. Fishing Loop (Core Gameplay)
-- First-person fishing in a shared world
-- **Cast mechanic**: hold click to charge a power bar (bounces up then down — release to set distance). Upward force ramps with hold duration to prevent feathering. Rod stats affect bar speed.
-- **Reel mechanic**: physics-based tug-of-war. Hold click to accelerate upward (reeling in), release to let gravity pull down (fish escaping). Upward force ramps with hold duration. Fish fight varies gravity unpredictably. Progress = total hold time. Hit top = line breaks. Hit bottom = fish escapes.
-- **Catch visual**: 2D sprite billboard appears in-world on the line (faces camera, scales with fish size)
-- Fish rarity is determined server-side (common → uncommon → rare → epic → legendary)
-- **Size system**: each catch rolls a size (weight/length) on a bell curve. Stored as Steam Inventory dynamic property. Extreme sizes are rare and have collector/market value. Does NOT affect battle stats.
-- Seasonal and limited creatures exist with hard supply caps (e.g. Halloween creatures, launch exclusives)
-- **Bait system (equivalent to Pokéballs)**: different bait tiers influence what rarity you can attract
-  - Basic bait: common only
-  - Mid-tier bait: uncommon + chance at rare
-  - Premium bait: unlocks legendary pool
-  - Bait is consumed on cast — purchased with in-game currency
-- Upgrade your rod, bait, and fishing equipment to improve catch rates and access new fishing spots
-- Tycoon-style progression: automate and optimize your fishing operation over time
+### 1. Fishing Loop
+- Third-person fishing in a shared world
+- **Cast**: hold to charge power bar (bounces up/down, release to set distance). Direction locked at cast start. Arc to water surface.
+- **Reel**: physics-based minigame. Hold to accelerate up (ramps with hold duration, anti-feather). Gravity pulls down. Fish fight varies gravity unpredictably. Hit top = line breaks. Hit bottom = fish escapes. Progress = total hold time.
+- **Catch visual**: 2D sprite billboard in-world (faces camera, scales with size)
+- **Bobber**: networked object visible to all players, line drawn from rod tip
+- Water detection determines valid cast
 
-### 2. Creature Battles
-- Catch creatures and build a team to battle with
-- Battle format: **Super Auto Pets style auto-battler** — build your lineup, battles play out automatically in 2D
-- Skill expression is in team composition, ordering, and synergies — not mechanical input
-- **Balance philosophy:**
-  - Rarity ≠ auto-win. Legendary creatures have unique abilities, not just bigger stats.
-  - Team composition and synergies matter more than individual power
-  - Types/categories (freshwater, saltwater, deep, etc.) create synergy bonuses
-  - Ordering matters (front creatures tank, back creatures deal damage)
-  - A well-synergized common team can beat a random legendary team
-  - Common creatures stay relevant forever because synergies need them
-- The "shop" is the lake — you fish for your team units instead of buying from a random shop each round
-- Players can battle each other (PvP) or fight NPCs to level up creatures and unlock new areas
-- **Staking**: players can optionally stake a creature on a battle — winner takes the loser's
-- Daily XP/level caps enforced server-side — prevents botting from outpacing dedicated players
-- Battles are fun to watch and streamable — automatic resolution with visual flair
-- Battle server determines winner — zero client input on outcome (tamper-proof)
+### 2. Size & Rarity System
+- Every catch rolls a size (weight/length) on a continuous bell curve
+- Extreme sizes (tiny/giant) are rare — collector value
+- Rarity tiers: common → uncommon → rare → epic → legendary
+- Size does NOT affect gameplay — purely collectible/bragging rights
 
-### 2.5. Fishdex (Collection)
-- Grid UI showing silhouettes of all species in the game
-- Uncaught species show as a blanked-out icon of the creature's shape
-- Once caught, the entry becomes fully colored in with art, name, stats, rarity, and lore
-- "Caught" status is permanent — trading away doesn't remove it from your Fishdex
-- Fishdex is stored in Steam Cloud save (record of what you've caught, not what you own)
-- Steam Achievement unlocked per species caught — public achievement percentages show rarity
-- Completion milestones: percentage-based rewards for catching X% of all species
-- Seasonal/limited entries are visible year-round but can only be caught during their active window
+### 3. Personal-Best Tracking
+- Per-species biggest catch recorded
+- "New personal best!" celebration on beating your record
+- This never runs dry — there's always a bigger fish to chase
 
-### 3. Economy
-- All creatures are Steam Inventory items — minted on successful catch, fully tradeable
-- Common creatures are stackable — high supply, low value, tradeable
-- Rare and legendary creatures are non-stackable — low supply, high value, tradeable on Steam Community Market
-- In-game currency earned from fishing funds upgrades, bait, and shop purchases
-- Player-to-player trading handled via server-side atomic swap (escrow model)
-- Server-side validation for all economy actions: catch grants, trades, currency transactions
-- Minting is on-demand server-side — common creatures have no supply cap, rare/legendary have configurable caps
-- **Dynamic properties per item**: size, level, XP, nickname — stored on the Steam Inventory item instance, travel with trades
-- Seasonal creatures: limited supply + limited time window enforced by server config
+### 4. Fishdex (Collection)
+- Grid UI showing silhouettes for uncaught, full art for caught
+- "Caught" status is permanent
+- Steam Achievement per species caught
+- Counter: X / Total caught
+- Completion milestones for catching X% of all species
 
-### 4. Player World (TBD)
-- Players may have personal lots they can build and decorate
-- Lots could serve as fishing spots, creature displays, and social spaces
-- Other players can visit your lot
-- Shared world vs instanced lots — undecided, depends on core loop direction
+### 5. NPC Shop (Sell/Buy)
+- Sell caught fish for currency (fixed or slowly-drifting prices)
+- Buy bait (tiers gate what rarity you can attract)
+- Buy rod upgrades
+- Buy cosmetics / trophy displays
+- No player-to-player economy — just NPC vendor
 
-### 5. Social Chaos
-- Players share a physical space and can interact with each other
-- Physics-based chaos: knockback, impulse effects, vehicles
-- Fishing rod can hook other players (pull them toward you)
-- Upgrades and items that mess with other players (tasers, knockback, etc.)
-- Not competitive — the chaos is for fun, not to determine a winner
+### 6. Gear Tiers Gating Zones
+- Rod + bait upgrades unlock new fishing areas
+- Data-driven: zone → required gear tier → fish table
+- Adding new zones is content, not code
+- Each zone has unique fish species not available elsewhere
+
+### 7. Shared Lobbies
+- Friends and strangers fishing near each other
+- See each other cast, reel, catch
+- Visit the same fishing spots
+- No PvP, no trading, no staking at launch
 - Voice chat via Steam Voice API
+
+### 8. Save Persistence
+- Progress follows you into any lobby (Steam Cloud)
+- Currency, Fishdex, personal bests, gear owned — all saved
+- Load on lobby join, save on key events
+
+---
+
+## Should-Have (do if MVP feels thin)
+
+- **Weather/tide** affecting bite behavior — cheap ongoing freshness
+- **Friend comparison** — trophy shelf or leaderboard showing PBs vs friends
+- **Seasonal fish** — limited time species that appear during events
+
+---
+
+## Post-Launch Features (NOT in MVP)
+
+- **Steam Inventory economy** (tradeable fish, Community Market)
+- **Personal lots** (build/decorate your own space)
+- **Trading between players**
+- **Fantasy/mythical creatures** (expansion content)
+- **More zones** (5+)
+- **Events / seasonal content calendar**
 
 ---
 
 ## Creature Design
 
-- Creatures are stylized/fantasy-inspired, not photorealistic animals
-- Original names and designs (inspired by real fish/animals but with fantastical twists)
-- May include non-fish creatures later (frogs, turtles, crabs, fantasy animals)
-- **Art style**: hand-drawn 2D in GIMP
-  - 512x512 PNG, transparent background
-  - 4px black outline, flat color fills with 1-2 shading tones
-  - Each creature at its most recognizable angle (side for fish, 3/4 for others)
-  - Consistent eye style, outline weight, and detail level across all creatures
+- Real fish species for launch (recognizable, easy to reference)
+- Stylized art style (painterly/watercolor-inspired, no black outlines)
+- 1024x1024 PNG, transparent background
+- May add fantasy creatures post-launch as legendary tier
 - Each creature needs: full color icon + silhouette version
-- In-world representation: 2D sprite billboard (faces camera, scales with size)
-- 3D models are post-launch polish — not required for early access
-- Art serves: Fishdex grid, Steam Inventory icon, catch reveal, battle sprites (one asset, multiple uses)
+- In-world: 2D sprite billboard (faces camera, scales with size)
 
 ---
 
 ## Multiplayer Model
 
 - Steam P2P via NGO + SteamNetworkingSocketsTransport
-- Friends-only lobbies, invite-only, and public lobbies (browseable with search/filter)
-- P2P host runs physics and game events — not authoritative over player economy data
-- Each player's save data is only written by their own client
-- A lightweight **fixed-cost VPS** ($12-24/month) handles all economy actions:
-  - Fish catch grants (rarity roll + Steam Inventory grant)
-  - Battle resolution (server simulates, sends replay to clients)
-  - Trade execution (atomic escrow swap)
-  - Session ticket authentication (Steam AuthenticateUserTicket)
-  - Rate limiting and daily caps
-  - Seasonal creature supply counters
-  - Redis for pending state and rate limit tracking
-
----
-
-## Economy Architecture
-
-- **All creatures**: minted on successful catch via server-side Steam Inventory grant
-- **Common**: stackable, unlimited supply, fully tradeable
-- **Rare/legendary**: non-stackable, configurable supply cap, tradeable
-- **Seasonal**: time-window + supply cap enforced server-side
-- **Catch flow**: client casts → server rolls rarity and species → server sends difficulty to client → player reels in → server confirms catch and grants item
-- **Battle flow**: both players submit lineups → server validates ownership → both confirm opponent's lineup → server simulates battle → server awards staked creature → server sends replay to both clients
-- **Trade flow**: both players propose → server holds escrow → both confirm → server executes atomic swap
-- **Identity**: Steam session tickets authenticate every server request
-- **Per-item properties** (Steam Inventory dynamic properties): size, level, XP, caught_date, nickname
+- Friends-only, invite-only, and public lobbies
+- P2P host runs physics and game events
+- Each player's save is client-authoritative (Steam Cloud)
+- No backend server needed for MVP (NPC shop is local, no player trading)
 
 ---
 
 ## Monetization
 
-- Game price: $5 on Steam (one-time purchase, no pay-to-win)
-- Players do not pay to fish, trade, or battle after purchase
-- Revenue streams:
-  - Box price (primary)
-  - Steam Community Market cut on every creature trade (passive, ongoing)
-  - Future DLC: cosmetics, new fishing locations, character items (none affecting economy)
+- Game price: $5 on Steam
+- No microtransactions, no pay-to-win
+- Revenue: box price + future DLC (new zones, cosmetics)
+- Steam Community Market deferred to post-launch with economy update
 
 ---
 
-## Legal / Regulatory Notes
-
-- No paid randomized loot boxes — creatures are earned through gameplay only
-- This keeps the game outside gambling regulations in most jurisdictions
-- Battle mechanic inspired by auto-battler genre — do not use "Pokémon" in marketing copy
-- Describe as "catch creatures and battle them"
-
----
-
-## Current State (June 2026)
+## Current State (July 2026)
 
 Working:
-- Steam lobby system (friends-only + public)
-- NGO session lifecycle (host/client, scene sync)
-- Player movement (owner-authoritative Rigidbody, first-person)
-- Fishing loop: cast with power bar, bobber arc, line renderer, water detection, reel minigame, catch success
-- Steam Inventory integration: granting fish on catch (publisher account)
-- Fishdex UI: grid with caught/uncaught states
+- Multiplayer lobby (host/join/friends)
+- Player movement (owner-authoritative Rigidbody, third-person orbit camera)
+- Fishing loop: cast with power bar, bobber arc, water detection, reel minigame, catch
+- Bobber synced as NetworkObject (all players see it)
+- Fishing line (LineRenderer from rod tip to bobber)
+- Steam Inventory grants on catch (publisher account)
+- Fishdex UI with caught/uncaught states
 - Catch reveal popup
+- Fish art (5 species, placeholder style)
 - Dev console for build debugging
-- Voice routing via Steam Voice API
+- Terrain environment with sculpted lake
+- URP render pipeline
+- Custom water shader (in progress)
 
-Pending:
-- Original creature art (replacing AI placeholders)
-- Environment polish (one lake area)
-- Battle system
-- Backend server (VPS + Redis)
-- Multiplayer fishing state sync (others seeing you fish)
-- Upgrade/shop system
-- NPC battles and progression areas
-- Player lot / world structure
+Pending for MVP:
+- Size/weight roll per catch + personal best tracking
+- NPC shop (sell fish, buy gear/bait)
+- Gear tier system + zone gating
+- Multiple fishing zones (2-3 areas)
+- More fish species (15-20 for launch)
+- Save persistence (Steam Cloud)
+- UI polish (Fishdex, catch reveal, shop)
+- Environment art (terrain, props, atmosphere)
+- Sound effects and music
+- Fishing rod model visible on character in third-person
 
 ---
 
-## Timeline (Target: Early Access January 2027)
+## Timeline (Target: Early Access)
 
-### Phase 1 — Marketable Demo (June - July 2026)
-- Art style locked (3 original creatures, hand-drawn)
-- One polished environment area
-- Fishing loop polished (rod visible, satisfying catch feel)
-- Steam store page live (Coming Soon + wishlist)
+### Phase 1 — Marketable Demo (Now - End of July)
+- Environment looks intentional (terrain, water shader, props)
+- Fishing loop polished and recorded for content
+- Steam store page live (Coming Soon)
 - First short-form content posted
 
-### Phase 2 — Core Game (August - October 2026)
-- Battle system working (SAP-style, 2D)
-- 15-20 creatures designed, drawn, and in-game
-- Backend server handling grants + rate limiting
-- Multiplayer: friends can fish together and see each other fishing
-- Fishdex feels satisfying
-- Basic progression (currency, upgrades to rod/bait)
+### Phase 2 — Core Systems (August - October)
+- Size/weight system + personal bests
+- NPC shop + currency
+- Gear upgrades + zone unlocking
+- 2-3 distinct fishing zones with unique fish
+- 15-20 fish species
+- Save persistence (Steam Cloud)
+- Multiplayer polish (others see you fishing correctly)
 
-### Phase 3 — Polish + Ship (November 2026 - January 2027)
-- 30+ creatures
+### Phase 3 — Polish + Ship (November - January 2027)
+- 20+ fish species
 - Sound effects and music
-- UI polish pass (Fishdex, catch reveal, menus)
-- Multiplayer chaos elements (at least one "mess with friends" mechanic)
+- UI polish pass
+- Environment polish (multiple zones look distinct)
 - Playtesting and bug fixing
 - Trailer and marketing push
 - Early access launch

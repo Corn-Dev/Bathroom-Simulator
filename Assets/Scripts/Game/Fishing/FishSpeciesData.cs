@@ -24,6 +24,14 @@ public class FishSpeciesData : ScriptableObject
     [Tooltip("How difficult the reel-in minigame is. 0 = trivial, 1 = very hard.")]
     [Range(0f, 1f)] public float reelDifficulty = 0.3f;
 
+    [Header("Size / Weight")]
+    [Tooltip("Average weight in kg for this species.")]
+    public float averageWeight = 2f;
+    [Tooltip("Maximum weight this species can reach (rare extreme catches).")]
+    public float maxWeight = 5f;
+    [Tooltip("Minimum weight (pygmy/baby catches).")]
+    public float minWeight = 0.2f;
+
     [Header("Battle Stats (Future)")]
     public int baseHealth = 10;
     public int baseAttack = 3;
