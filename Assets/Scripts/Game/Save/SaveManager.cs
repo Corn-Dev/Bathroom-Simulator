@@ -10,7 +10,8 @@ using UnityEngine;
 /// </summary>
 public class SaveManager : MonoBehaviour
 {
-    private const string SAVE_FILE_NAME = "phish_save.json";
+    private const string SAVE_FILE_NAME = "bathroomsim_save.json";
+    private const string LOCAL_SAVE_KEY = "BathroomSimSave";
 
     public static SaveManager Instance { get; private set; }
     public PlayerSaveData Data { get; private set; }
@@ -46,7 +47,7 @@ public class SaveManager : MonoBehaviour
         }
 
         // Fallback: local PlayerPrefs
-        PlayerPrefs.SetString("PhishSave", json);
+        PlayerPrefs.SetString(LOCAL_SAVE_KEY, json);
         PlayerPrefs.Save();
         Debug.Log("[SaveManager] Saved locally (Steam unavailable).");
     }
@@ -81,7 +82,7 @@ public class SaveManager : MonoBehaviour
         // Fallback: local
         if (string.IsNullOrEmpty(json))
         {
-            json = PlayerPrefs.GetString("PhishSave", "");
+            json = PlayerPrefs.GetString(LOCAL_SAVE_KEY, "");
             if (!string.IsNullOrEmpty(json))
                 Debug.Log("[SaveManager] Loaded from local storage.");
         }

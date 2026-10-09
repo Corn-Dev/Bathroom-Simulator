@@ -113,10 +113,6 @@ public class DevConsole : MonoBehaviour
 
     private void OnGUI()
     {
-        // Don't render over full-screen UI panels
-        var fishdex = FindFirstObjectByType<FishdexUI>();
-        if (fishdex != null && fishdex.IsOpen) return;
-
         InitStyles();
 
         // Determine visibility: show if focused, or if a recent message exists
@@ -218,7 +214,7 @@ public class DevConsole : MonoBehaviour
         switch (command.ToLower())
         {
             case "help":
-                Debug.Log("Commands: help, clear, fps, state, resetsave");
+                Debug.Log("Commands: help, clear, fps, resetsave");
                 break;
             case "clear":
                 logEntries.Clear();
@@ -226,17 +222,6 @@ public class DevConsole : MonoBehaviour
             case "fps":
                 Debug.Log($"FPS: {(1f / Time.unscaledDeltaTime):F0}");
                 break;
-            case "state":
-                var fishing = FindFirstObjectByType<FishingController>();
-                if (fishing != null)
-                    Debug.Log($"Fishing state: {fishing.CurrentState}");
-                else
-                    Debug.Log("No FishingController found.");
-                break;
-            case "clearinventory":
-                ClearSteamInventory();
-                break;
-            case "resetdex":
             case "resetsave":
                 if (SaveManager.Instance != null)
                 {
@@ -254,59 +239,4 @@ public class DevConsole : MonoBehaviour
         }
     }
 
-    private void ClearSteamInventory()
-    {
-        if (!SteamManager.Initialized)
-        {
-            Debug.LogError("Steam not initialized.");
-            return;
-        }
-
-        Debug.Log("Fetching inventory to clear...");
-        Steamworks.SteamInventoryResult_t result;
-        bool success = Steamworks.SteamInventory.GetAllItems(out result);
-        if (!success)
-        {
-            Debug.LogError("GetAllItems failed.");
-            return;
-        }
-
-        // Need to wait for the result — use a callback
-        Steamworks.Callback<Steamworks.SteamInventoryResultReady_t>.Create(cb =>
-        {
-            if (cb.m_handle != result) return;
-            if (cb.m_result != Steamworks.EResult.k_EResultOK)
-            {
-                Debug.LogError($"Inventory fetch failed: {cb.m_result}");
-                Steamworks.SteamInventory.DestroyResult(result);
-                return;
-            }
-
-            uint count = 0;
-            Steamworks.SteamInventory.GetResultItems(result, null, ref count);
-            if (count == 0)
-            {
-                Debug.Log("Inventory already empty.");
-                Steamworks.SteamInventory.DestroyResult(result);
-                return;
-            }
-
-            var items = new Steamworks.SteamItemDetails_t[count];
-            Steamworks.SteamInventory.GetResultItems(result, items, ref count);
-
-            int destroyed = 0;
-            for (int i = 0; i < count; i++)
-            {
-                Steamworks.SteamInventoryResult_t consumeResult;
-                if (Steamworks.SteamInventory.ConsumeItem(out consumeResult, items[i].m_itemId, items[i].m_unQuantity))
-                {
-                    destroyed++;
-                    Steamworks.SteamInventory.DestroyResult(consumeResult);
-                }
-            }
-
-            Debug.Log($"Cleared {destroyed}/{count} items from inventory.");
-            Steamworks.SteamInventory.DestroyResult(result);
-        });
-    }
 }

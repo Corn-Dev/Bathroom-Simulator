@@ -11,74 +11,63 @@ public class PlayerSaveData
     // Currency
     public int currency = 0;
 
-    // Fishdex — which species have been caught at least once
-    public List<string> caughtSpecies = new List<string>();
+    // Achievements the player has unlocked (Steam achievement API names).
+    public List<string> unlockedAchievements = new List<string>();
 
-    // Personal bests — biggest size caught per species
-    public List<PersonalBestEntry> personalBests = new List<PersonalBestEntry>();
+    // Generic unlockables (cosmetics, areas, etc.) keyed by id.
+    public List<string> unlockedItems = new List<string>();
 
-    // Fish inventory — fish the player is holding (to sell or keep)
-    public List<CaughtFishEntry> fishInventory = new List<CaughtFishEntry>();
-
-    // Gear
-    public string equippedRodId = "starter";
-    public string equippedBaitId = "basic";
-    public List<string> ownedRods = new List<string> { "starter" };
-    public List<string> ownedBait = new List<string> { "basic" };
-
-    // Zones unlocked
-    public List<string> unlockedZones = new List<string> { "pond" };
+    // Arbitrary counters for tracking stats that drive achievements
+    // (e.g. "flushes", "handsWashed"). Keyed by stat id.
+    public List<StatEntry> stats = new List<StatEntry>();
 
     // --- Helper methods ---
 
-    public bool HasCaughtSpecies(string fishId)
+    public bool HasAchievement(string achievementId)
     {
-        return caughtSpecies.Contains(fishId);
+        return unlockedAchievements.Contains(achievementId);
     }
 
-    public void RegisterCatch(string fishId, float size)
+    public void UnlockAchievement(string achievementId)
     {
-        // Mark species as caught
-        if (!caughtSpecies.Contains(fishId))
-            caughtSpecies.Add(fishId);
+        if (!unlockedAchievements.Contains(achievementId))
+            unlockedAchievements.Add(achievementId);
+    }
 
-        // Update personal best
-        var pb = personalBests.Find(p => p.fishId == fishId);
-        if (pb == null)
+    public bool HasItem(string itemId)
+    {
+        return unlockedItems.Contains(itemId);
+    }
+
+    public void UnlockItem(string itemId)
+    {
+        if (!unlockedItems.Contains(itemId))
+            unlockedItems.Add(itemId);
+    }
+
+    public int GetStat(string statId)
+    {
+        var entry = stats.Find(s => s.statId == statId);
+        return entry != null ? entry.value : 0;
+    }
+
+    public int IncrementStat(string statId, int amount = 1)
+    {
+        var entry = stats.Find(s => s.statId == statId);
+        if (entry == null)
         {
-            personalBests.Add(new PersonalBestEntry { fishId = fishId, bestSize = size });
-        }
-        else if (size > pb.bestSize)
-        {
-            pb.bestSize = size;
+            entry = new StatEntry { statId = statId, value = 0 };
+            stats.Add(entry);
         }
 
-        // Add to inventory
-        fishInventory.Add(new CaughtFishEntry { fishId = fishId, size = size });
-    }
-
-    public float GetPersonalBest(string fishId)
-    {
-        var pb = personalBests.Find(p => p.fishId == fishId);
-        return pb != null ? pb.bestSize : 0f;
-    }
-
-    public int GetCaughtCount()
-    {
-        return caughtSpecies.Count;
+        entry.value += amount;
+        return entry.value;
     }
 }
 
 [Serializable]
-public class PersonalBestEntry
+public class StatEntry
 {
-    public string fishId;
-    public float bestSize;
-}
-
-[Serializable]
-public class CaughtFishEntry
-{
-    public string fishId;
-    public float size;
+    public string statId;
+    public int value;
 }

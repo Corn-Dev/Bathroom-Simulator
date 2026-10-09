@@ -16,7 +16,7 @@ public class GameSessionBootstrap : MonoBehaviour
 
     private void HandleSessionReady()
     {
-        Debug.Log("Session ready — load fishing progress here.");
-        // FishingPlayerProgressService.Load(...) goes here when ready
+        Debug.Log("Session ready — load player progress here.");
+        // PlayerProgressService load goes here when ready
     }
 }
