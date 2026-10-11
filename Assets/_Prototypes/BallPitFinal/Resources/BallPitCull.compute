@@ -1,0 +1,138 @@
+// GPU-driven visibility for resting balls: scatter updates, 8x8 tile max-depth reduction, frustum + occlusion cull.
+#pragma kernel CSScatter
+#pragma kernel CSReduceTiles
+#pragma kernel CSCull
+
+#define DRAWABLE 256u
+#define TILE 8
+
+struct BallInstance { float3 pos; uint packed; };
+struct BallUpdate { uint id; float3 pos; uint packed; };
+
+// ---------------- Scatter (CPU dirty list -> instance buffer) ----------------
+StructuredBuffer<BallUpdate> _Updates;
+RWStructuredBuffer<BallInstance> _InstancesRW;
+uint _UpdateCount;
+
+[numthreads(64, 1, 1)]
+void CSScatter(uint3 t : SV_DispatchThreadID)
+{
+    if (t.x >= _UpdateCount) return;
+    BallUpdate u = _Updates[t.x];
+    BallInstance b;
+    b.pos = u.pos;
+    b.packed = u.packed;
+    _InstancesRW[u.id] = b;
+}
+
+// ---------------- Tile reduce: max eye depth per 8x8 pixel tile ----------------
+Texture2D<float> _OccDepth;      // eye depth of occluders (RFloat), large value = nothing there
+RWTexture2D<float> _TileMaxRW;
+uint2 _ScreenSize;
+groupshared float gsDepth[TILE * TILE];
+
+[numthreads(TILE, TILE, 1)]
+void CSReduceTiles(uint3 gtid : SV_GroupThreadID, uint3 gid : SV_GroupID, uint3 dtid : SV_DispatchThreadID)
+{
+    uint idx = gtid.y * TILE + gtid.x;
+    float d = 0.0; // off-screen pixels must not raise the max
+    if (dtid.x < _ScreenSize.x && dtid.y < _ScreenSize.y) d = _OccDepth[dtid.xy];
+    gsDepth[idx] = d;
+    GroupMemoryBarrierWithGroupSync();
+    [unroll]
+    for (uint s = (TILE * TILE) / 2; s > 0; s >>= 1)
+    {
+        if (idx < s) gsDepth[idx] = max(gsDepth[idx], gsDepth[idx + s]);
+        GroupMemoryBarrierWithGroupSync();
+    }
+    if (idx == 0) _TileMaxRW[gid.xy] = gsDepth[0];
+}
+
+// ---------------- Cull ----------------
+StructuredBuffer<BallInstance> _Instances;
+AppendStructuredBuffer<uint> _VisibleNear;
+AppendStructuredBuffer<uint> _VisibleFar;
+Texture2D<float> _TileMax;
+uint _InstanceCount;
+uint2 _TileCount;
+float4 _CullScreen;          // x = width px, y = height px
+float4 _FrustumPlanes[6];    // world space, inward normals (Unity GeometryUtility convention)
+float4x4 _CullView;          // camera.worldToCameraMatrix
+float4x4 _CullViewProj;      // camera.projectionMatrix * view (GL convention, unflipped)
+float _CullRadius;           // bounding radius (slightly > visual radius)
+float _NearClip;
+float _ProjScaleY;           // proj[1,1] * height * 0.5
+float _LodPixelRadius;       // projected radius above which the near (high-poly) LOD is used
+float _OcclusionOn;
+float _FlipY;                // debug safety valve if the occluder target ends up vertically flipped
+float _DepthBias;
+
+[numthreads(64, 1, 1)]
+void CSCull(uint3 t : SV_DispatchThreadID)
+{
+    uint i = t.x;
+    if (i >= _InstanceCount) return;
+    BallInstance b = _Instances[i];
+    if ((b.packed & DRAWABLE) == 0u) return;
+
+    float3 c = b.pos;
+    float r = _CullRadius;
+
+    [unroll]
+    for (uint p = 0; p < 6; p++)
+    {
+        if (dot(_FrustumPlanes[p].xyz, c) + _FrustumPlanes[p].w < -r) return;
+    }
+
+    float eye = -mul(_CullView, float4(c, 1.0)).z;
+    float nearest = eye - r;
+
+    if (_OcclusionOn > 0.5 && nearest > _NearClip)
+    {
+        float2 mn = float2(1e9, 1e9);
+        float2 mx = float2(-1e9, -1e9);
+        bool valid = true;
+        [unroll]
+        for (uint k = 0; k < 8; k++)
+        {
+            float3 o = float3((k & 1u) != 0u ? r : -r, (k & 2u) != 0u ? r : -r, (k & 4u) != 0u ? r : -r);
+            float4 h = mul(_CullViewProj, float4(c + o, 1.0));
+            if (h.w <= 1e-5) valid = false;
+            float2 ndc = h.xy / max(h.w, 1e-5);
+            mn = min(mn, ndc);
+            mx = max(mx, ndc);
+        }
+        if (valid)
+        {
+            float2 uvMin = saturate(mn * 0.5 + 0.5);
+            float2 uvMax = saturate(mx * 0.5 + 0.5);
+            if (_FlipY > 0.5)
+            {
+                float y0 = 1.0 - uvMax.y;
+                uvMax.y = 1.0 - uvMin.y;
+                uvMin.y = y0;
+            }
+            int2 lim = int2(_TileCount) - 1;
+            // Pixel coords are non-negative (uv is saturated), so use uint shift
+            // by log2(TILE)=3 instead of a signed divide (silences the warning,
+            // and is a cheap shift at 1M invocations).
+            uint2 pxMin = (uint2)max(int2(uvMin * _CullScreen.xy), int2(0, 0));
+            uint2 pxMax = (uint2)max(int2(uvMax * _CullScreen.xy), int2(0, 0));
+            int2 tMin = clamp(int2(pxMin >> 3u), int2(0, 0), lim);
+            int2 tMax = clamp(int2(pxMax >> 3u), int2(0, 0), lim);
+            int2 span = tMax - tMin + 1;
+            if (span.x <= 8 && span.y <= 8)
+            {
+                float maxD = 0.0;
+                for (int ty = tMin.y; ty <= tMax.y; ty++)
+                    for (int tx = tMin.x; tx <= tMax.x; tx++)
+                        maxD = max(maxD, _TileMax[int2(tx, ty)]);
+                if (nearest > maxD + _DepthBias) return; // fully behind the farthest occluder in its footprint
+            }
+        }
+    }
+
+    float pixR = r * _ProjScaleY / max(eye, 1e-4);
+    if (pixR > _LodPixelRadius) _VisibleNear.Append(i);
+    else _VisibleFar.Append(i);
+}
