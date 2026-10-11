@@ -24,7 +24,7 @@ namespace BallPitFinal
         private int liveCount;
         private readonly GameObject root;
 
-        public ColliderShell(int maxColliders, int ballCapacity, float colliderRadius, PhysicMaterial mat)
+        public ColliderShell(int maxColliders, int ballCapacity, float colliderRadius, PhysicMaterial mat, int layer)
         {
             cols = new SphereCollider[maxColliders];
             trs = new Transform[maxColliders];
@@ -42,6 +42,7 @@ namespace BallPitFinal
             {
                 if (group == null || group.childCount >= 256) { group = new GameObject("group").transform; group.SetParent(root.transform, false); }
                 var go = new GameObject("sc");
+                go.layer = layer;
                 go.transform.SetParent(group, false);
                 var c = go.AddComponent<SphereCollider>();
                 c.radius = colliderRadius;
@@ -90,6 +91,8 @@ namespace BallPitFinal
             while (liveCount > 0) ReleaseSlot(liveSlots[liveCount - 1]);
             CapHits = 0;
         }
+
+        public void ResetCapHits() => CapHits = 0;
 
         private void ReleaseSlot(int s)
         {

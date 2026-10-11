@@ -168,9 +168,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   settings:
-    pitX: 1000
-    pitY: 1000
-    pitZ: 1000
+    fillType: 0
+    pitX: 100
+    pitY: 100
+    pitZ: 100
     ballDiameter: 0.5
     colorCount: 4
     seed: 12345
@@ -178,17 +179,22 @@ MonoBehaviour:
     jitter: 1
     pitWalls: 1
     renderWalls: 1
-    maxActive: 1500
+    ballLayer: 8
+    maxActive: 4100
     activePoolSize: 1600
+    collapseReserve: 200
     linearDrag: 0.05
     angularDrag: 1.2
     maxDepenetrationVelocity: 1
     bounciness: 0.2
     friction: 0.5
+    sleepThreshold: 0.01
     physicsHz: 50
-    supportThawsPerStep: 200
+    supportThawsPerStep: 1500
+    maxSupportChecksPerStep: 8000
     impactThawsPerStep: 40
     fastSpeed: 2.5
+    impactMaxNeighbors: 2
     thawMoveFraction: 0.1
     stillEpsilonFraction: 0.004
     stillSeconds: 1
@@ -198,6 +204,24 @@ MonoBehaviour:
     colliderReachDiameters: 1.3
     colliderKeepSeconds: 1
     colliderReleasePerStep: 256
+    vacuumRadius: 1.5
+    vacuumPerStep: 20
+    undermineDepth: 8
+    undermineRadius: 4
+    undermineMax: 20000
+    dumpPerStep: 6
+    dumpHeight: 3
+    dumpSpread: 0.6
+  network:
+    address: 127.0.0.1
+    port: 7777
+    sendRate: 20
+    snapshotBytesPerSecond: 64000
+    reliableBytesPerSecond: 262144
+    reliableBurstBytes: 65536
+    syncChunkBytes: 16384
+    interpolationDelay: 0.12
+    viewSendRate: 20
   occlusionCulling: 1
   flipOcclusionY: 0
   lodPixelRadius: 12
@@ -207,9 +231,7 @@ MonoBehaviour:
   farLodSubdivisions: 1
   throwSpeed: 12
   throwUpBias: 2.5
-  digRadiusDiameters: 3
-  maxBulkDig: 500
-  digOutSpeed: 3
+  benchScenario: 0
   autoLogInterval: 2
 --- !u!1660057539 &9223372036854775807
 SceneRoots:

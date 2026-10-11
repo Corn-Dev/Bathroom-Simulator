@@ -4,9 +4,11 @@ using UnityEngine;
 namespace BallPitFinal
 {
     /// <summary>
-    /// The only live physics: a pool of real Rigidbodies. Interpolation is done here (prev/curr physics poses),
-    /// not by Unity, so a pooled body teleported to a new ball never streaks from its old pose.
-    /// All reads use rb.position (the physics pose), never transform.position.
+    /// The only live physics: real Rigidbodies, created lazily up to MaxActive. The pool IS the budget; there is no
+    /// separate pool size that can silently clamp it (that clamp pinned the active set at 1,600 in milestone 2).
+    /// Parked bodies stay on active GameObjects with the collider disabled and the body kinematic, so park/unpark never
+    /// touches the hierarchy (no SetActive churn, no OnEnable/OnDisable, no editor hierarchy repaint).
+    /// Interpolation is our own (prev/curr physics poses); all reads use rb.position (the physics pose).
     /// </summary>
     public sealed class ActivePhysics : System.IDisposable
     {
@@ -14,49 +16,80 @@ namespace BallPitFinal
         {
             public int id;
             public Rigidbody rb;
-            public bool carried, teleport;
+            public SphereCollider col;
+            public bool carried, teleport, damped;
             public Vector3 prev, curr, eventPose, stillAnchor, lastSourcePos;
             public float stillTime;
             public int lastSourceStep;
         }
 
+        private struct Parked { public Rigidbody rb; public SphereCollider col; }
+
+        /// <summary>Live budget (set every step from PitSettings.maxActive). The pool grows to it on demand.</summary>
         public int MaxActive;
         public int Count => count;
-        public bool CanPromote => count < MaxActive && free.Count > 0;
+        public int Created => created;
+        public bool CanPromote => count < MaxActive;
+        public bool CanPromoteWithin(int limit) => count < Mathf.Min(limit, MaxActive);
 
-        private readonly Body[] bodies;
-        private int count;
-        private readonly int[] bodyOfBall; // per ball id -> index into bodies, or -1
-        private readonly Stack<Rigidbody> free = new Stack<Rigidbody>();
+        // Settling damping (rolling resistance for slow balls); set live from PitSettings.
+        public float SettleSpeed = 0.25f, SettleDrag = 1f, SettleAngularDrag = 6f;
+        public float LinearDrag, AngularDrag;
+
+        private Body[] bodies;
+        private int count, created;
+        private readonly int[] bodyOfBall;
+        private readonly Stack<Parked> free = new Stack<Parked>();
         private readonly GameObject root;
+        private Transform group;
+        private readonly float colliderRadius, maxDepen, sleepThreshold;
+        private readonly PhysicMaterial mat;
+        private readonly int layer, solverIterations;
 
-        public ActivePhysics(int ballCapacity, int poolSize, int maxActive, float colliderRadius, PhysicMaterial mat,
-                             float linearDrag, float angularDrag, float maxDepenetration)
+        public ActivePhysics(int ballCapacity, int maxActive, int prewarm, float colliderRadius, PhysicMaterial mat,
+                             float linearDrag, float angularDrag, float maxDepenetration, float sleepThreshold,
+                             int layer, int solverIterations)
         {
-            MaxActive = Mathf.Min(maxActive, poolSize);
-            bodies = new Body[poolSize];
+            MaxActive = maxActive;
+            this.colliderRadius = colliderRadius; this.mat = mat;
+            LinearDrag = linearDrag; AngularDrag = angularDrag;
+            maxDepen = maxDepenetration; this.sleepThreshold = sleepThreshold;
+            this.layer = layer; this.solverIterations = solverIterations;
+            bodies = new Body[Mathf.Max(64, maxActive)];
             bodyOfBall = new int[ballCapacity];
             for (int i = 0; i < ballCapacity; i++) bodyOfBall[i] = -1;
-
             root = new GameObject("BallPitFinal_ActivePool");
-            Transform group = null;
-            for (int i = 0; i < poolSize; i++)
+            Grow(Mathf.Max(0, prewarm));
+        }
+
+        private void Grow(int n)
+        {
+            for (int i = 0; i < n; i++)
             {
-                if (i % 128 == 0) { group = new GameObject("group").transform; group.SetParent(root.transform, false); }
+                if (created % 128 == 0) { group = new GameObject("group").transform; group.SetParent(root.transform, false); }
                 var go = new GameObject("active");
+                go.layer = layer;
                 go.transform.SetParent(group, false);
+                go.transform.position = new Vector3(0f, -10000f, 0f);
                 var col = go.AddComponent<SphereCollider>();
                 col.radius = colliderRadius;
                 col.sharedMaterial = mat;
+                col.enabled = false;
                 var rb = go.AddComponent<Rigidbody>();
                 rb.mass = 0.1f;
-                rb.drag = linearDrag;
-                rb.angularDrag = angularDrag;
+                rb.drag = LinearDrag;
+                rb.angularDrag = AngularDrag;
+                rb.sleepThreshold = sleepThreshold;
                 rb.interpolation = RigidbodyInterpolation.None;
                 rb.collisionDetectionMode = CollisionDetectionMode.Discrete;
-                rb.maxDepenetrationVelocity = maxDepenetration;
-                go.SetActive(false);
-                free.Push(rb);
+                rb.maxDepenetrationVelocity = maxDepen;
+                rb.centerOfMass = Vector3.zero;
+                rb.inertiaTensorRotation = Quaternion.identity;
+                rb.inertiaTensor = Vector3.one * (0.4f * rb.mass * colliderRadius * colliderRadius); // solid sphere, fixed (no recompute on collider toggles)
+                if (solverIterations > 0) rb.solverIterations = solverIterations;
+                rb.isKinematic = true;
+                free.Push(new Parked { rb = rb, col = col });
+                created++;
             }
         }
 
@@ -66,20 +99,31 @@ namespace BallPitFinal
         public Vector3 PosAt(int i) => bodies[i].curr;
         public Vector3 VelAt(int i) => bodies[i].carried ? Vector3.zero : bodies[i].rb.velocity;
 
+        public Vector3 VelocityOf(int id)
+        {
+            int idx = bodyOfBall[id];
+            if (idx < 0 || bodies[idx].carried) return Vector3.zero;
+            return bodies[idx].rb.velocity;
+        }
+
         public bool Promote(int id, Vector3 p, Vector3 velocity, bool carried)
         {
-            if (!CanPromote || bodyOfBall[id] >= 0) return false;
-            Rigidbody rb = free.Pop();
-            GameObject go = rb.gameObject;
-            go.transform.position = p;
-            go.SetActive(true);
-            rb.isKinematic = carried;
+            if (count >= MaxActive || bodyOfBall[id] >= 0) return false;
+            if (free.Count == 0) Grow(Mathf.Clamp(MaxActive - created, 1, 256));
+            if (free.Count == 0) return false;
+            Parked pk = free.Pop();
+            Rigidbody rb = pk.rb;
+            rb.transform.position = p;
             rb.position = p;
-            if (!carried) { rb.velocity = velocity; rb.angularVelocity = Vector3.zero; }
-            rb.WakeUp();
+            rb.isKinematic = carried;
+            pk.col.enabled = true;
+            rb.drag = LinearDrag;
+            rb.angularDrag = AngularDrag;
+            if (!carried) { rb.velocity = velocity; rb.angularVelocity = Vector3.zero; rb.WakeUp(); }
+            if (count == bodies.Length) System.Array.Resize(ref bodies, bodies.Length * 2);
             bodies[count] = new Body
             {
-                id = id, rb = rb, carried = carried, teleport = carried,
+                id = id, rb = rb, col = pk.col, carried = carried, teleport = carried,
                 prev = p, curr = p, eventPose = p, stillAnchor = p, lastSourcePos = p,
                 stillTime = 0f, lastSourceStep = int.MinValue / 2
             };
@@ -87,22 +131,38 @@ namespace BallPitFinal
             return true;
         }
 
-        /// <summary>Removes the body from physics and returns its exact physics pose.</summary>
+        /// <summary>Removes the body from physics (parks it) and returns its exact physics pose.</summary>
         public Vector3 Demote(int id)
         {
             int idx = bodyOfBall[id];
             if (idx < 0) return Vector3.zero;
             Rigidbody rb = bodies[idx].rb;
+            SphereCollider col = bodies[idx].col;
             Vector3 pose = rb.position;
             if (!rb.isKinematic) { rb.velocity = Vector3.zero; rb.angularVelocity = Vector3.zero; }
-            rb.gameObject.SetActive(false);
-            free.Push(rb);
+            col.enabled = false;
+            rb.isKinematic = true;
+            free.Push(new Parked { rb = rb, col = col });
             int last = count - 1;
             if (idx != last) { bodies[idx] = bodies[last]; bodyOfBall[bodies[idx].id] = idx; }
             bodies[last] = default;
             count--;
             bodyOfBall[id] = -1;
             return pose;
+        }
+
+        /// <summary>Grab a ball that is already moving: the same body becomes kinematic and follows the hand.</summary>
+        public void SetCarried(int id)
+        {
+            int idx = bodyOfBall[id];
+            if (idx < 0) return;
+            ref Body b = ref bodies[idx];
+            if (b.carried) return;
+            b.rb.velocity = Vector3.zero;
+            b.rb.angularVelocity = Vector3.zero;
+            b.rb.isKinematic = true;
+            b.carried = true;
+            b.teleport = true;
         }
 
         /// <summary>Kinematic follow for a held ball. First move after grabbing is a teleport (no sweep through the pile).</summary>
@@ -132,6 +192,9 @@ namespace BallPitFinal
             b.rb.angularVelocity = Vector3.zero;
             b.eventPose = b.stillAnchor = b.rb.position;
             b.stillTime = 0f;
+            b.damped = false;
+            b.rb.drag = LinearDrag;
+            b.rb.angularDrag = AngularDrag;
         }
 
         public bool NeedsSourceRefresh(int i, int step, float minMoveSqr, int maxAgeSteps)
@@ -148,15 +211,19 @@ namespace BallPitFinal
         }
 
         /// <summary>
-        /// After Physics.Simulate: copy poses into the store + active grid, emit motion events (ball moved more than
-        /// moveThreshold since its last event; the OLD pose is reported because that is where it was supporting others),
-        /// and collect freeze candidates (PhysX island asleep, or still for stillSeconds as a jitter fallback).
+        /// After Physics.Simulate: copy poses into the store + live grid; emit motion events (moved more than
+        /// moveThreshold since the last event; the OLD pose is reported because that is where it supported others);
+        /// apply settling damping to slow balls; collect freeze candidates.
+        /// Freeze rule (robust to solver jitter in deep piles): PhysX island asleep, OR speed below freezeSpeed for
+        /// freezeSeconds while drifting less than maxStillDrift. The old rule (moved less than 2 mm over 1 s) never
+        /// fired in a jittering 1,600-ball heap, so the pool stayed full for minutes.
         /// </summary>
-        public void PostStep(float dt, float moveThreshold, float stillEpsilon, float stillSeconds,
-                             BallStore store, SpatialGrid activeGrid,
+        public void PostStep(float dt, float moveThreshold, float freezeSpeed, float freezeSeconds, float maxStillDrift,
+                             BallStore store, SpatialGrid liveGrid,
                              List<int> movedIds, List<Vector3> movedFrom, List<int> freezeCandidates)
         {
-            float move2 = moveThreshold * moveThreshold, still2 = stillEpsilon * stillEpsilon;
+            float move2 = moveThreshold * moveThreshold, fs2 = freezeSpeed * freezeSpeed, drift2 = maxStillDrift * maxStillDrift;
+            float enter2 = SettleSpeed * SettleSpeed, exit2 = enter2 * 2.25f;
             for (int i = 0; i < count; i++)
             {
                 ref Body b = ref bodies[i];
@@ -164,7 +231,7 @@ namespace BallPitFinal
                 b.prev = b.curr;
                 b.curr = p;
                 store.pos[b.id] = p;
-                activeGrid.Move(b.id, p);
+                liveGrid.Move(b.id, p);
                 if (b.carried) continue;
 
                 if ((p - b.eventPose).sqrMagnitude > move2)
@@ -173,17 +240,27 @@ namespace BallPitFinal
                     movedFrom.Add(b.eventPose);
                     b.eventPose = p;
                 }
-                if ((p - b.stillAnchor).sqrMagnitude > still2) { b.stillAnchor = p; b.stillTime = 0f; }
-                else b.stillTime += dt;
 
-                if (b.rb.IsSleeping() || b.stillTime >= stillSeconds) freezeCandidates.Add(b.id);
+                float v2 = b.rb.velocity.sqrMagnitude;
+                bool slow = b.damped ? v2 < exit2 : v2 < enter2;
+                if (slow != b.damped)
+                {
+                    b.damped = slow;
+                    b.rb.drag = slow ? SettleDrag : LinearDrag;
+                    b.rb.angularDrag = slow ? SettleAngularDrag : AngularDrag;
+                }
+
+                if (v2 < fs2 && (p - b.stillAnchor).sqrMagnitude < drift2) b.stillTime += dt;
+                else { b.stillTime = 0f; b.stillAnchor = p; }
+
+                if (b.rb.IsSleeping() || b.stillTime >= freezeSeconds) freezeCandidates.Add(b.id);
             }
         }
 
-        /// <summary>Interpolated render positions (alpha in [0,1] between the last two physics steps).</summary>
-        public int FillInstances(BallInstance[] dst, float alpha, BallStore store)
+        /// <summary>Interpolated render positions (alpha in [0,1] between the last two physics steps) + ids for picking.</summary>
+        public int FillInstances(BallInstance[] dst, int[] ids, float alpha, BallStore store)
         {
-            int n = Mathf.Min(count, dst.Length);
+            int n = Mathf.Min(count, Mathf.Min(dst.Length, ids.Length));
             for (int i = 0; i < n; i++)
             {
                 ref Body b = ref bodies[i];
@@ -192,6 +269,7 @@ namespace BallPitFinal
                     pos = Vector3.LerpUnclamped(b.prev, b.curr, alpha),
                     packed = store.color[b.id] | GpuBallRenderer.DrawableBit
                 };
+                ids[i] = b.id;
             }
             return n;
         }

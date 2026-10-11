@@ -56,6 +56,16 @@ Those two are the only things likely to cause lag going forward.
 
 These steering files are the living design record; update them as decisions firm up.
 
+> **Steam app / project rename [DECIDED]:** reuse the existing (unreleased, no
+> public store page) **Phish** Steam app — rename it in Steamworks rather than
+> registering a new AppID. Rationale: the AppID is just a number (store name, art,
+> description are editable), the foundation (Steamworks.NET init, lobbies, Steam
+> Cloud saves) is already wired to it, and a new app costs the $100 Direct fee +
+> the Steam-key request cooldown the user flagged. Safe to reuse precisely because
+> Phish was never released (no reviews/ownership baggage). The in-engine project
+> folder is still named "Bathroom Simulator"; the eventual code/folder rename to
+> the final title is separate deferred work.
+
 > **Who drives implementation:** a stronger Kiro instance on a separate computer
 > (no repo access) leads the hard implementation work and did substantially better
 > on the pit rewrite. This repo's Kiro primarily **applies the changes that Kiro

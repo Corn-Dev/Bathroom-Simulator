@@ -251,6 +251,48 @@ is the real foundation; the other `_Prototypes` folders (`BallPitVoxel`,
 `BallPitHybrid`, `BallPhysicsStress`, `StaticColliderTest`) are earlier
 throwaway experiments kept only for reference.
 
+### Milestone 2 landed (integrated, pending in-Unity test)
+The other Kiro's milestone-2 drop (handoff `Assets/reball/`, now integrated and
+the staging folder deleted) added the networking layer + a collapse stress tool,
+and split the old monolithic `PitSimulation` into three:
+- **`PitSettings`** — all tunables (now incl. tools, fill type, ball layer, sleep
+  threshold, collapse reserve).
+- **`PitWorld`** — state shared by host AND client. The ONLY state writers are
+  `ToResting` / `ToLive` / `ToGone`; everything (ledger, both grids, colliders,
+  renderer) stays consistent through them. Clients replay host events through the
+  same three functions, so every peer's ledger is exact.
+- **`PitAuthority`** — host-only rules (thaw/freeze, support-loss collapse via a
+  min-heap `SupportQueue`, impacts, tools, budget). Supports up to 4 players.
+- New: **`Quantizer`** (Q21 poses, snapped once at fill/freeze so every peer
+  agrees bit-for-bit; Q16 for moving-ball snapshots), **`NetPit`** (NGO
+  host-auth replication via `CustomMessagingManager` — header/sync/events reliable,
+  active snapshots unreliable, intents + view from clients; no per-ball
+  NetworkObject), **`PitReplica`** (client-side interpolated live balls),
+  **`RandomFill`** (poured ~0.58 loose packing, worker-thread, cached to
+  `StreamingAssets/BallPitFills` — walls slump instead of FCC-terracing),
+  **`CollapseBench`** (K-key repeatable load generator + CSV).
+- New extraction primitive **`Excavate`** (V vacuum / U undermine → balls to a
+  per-player hopper as data) and **`Dump`** (G → pour the hopper back as real
+  physics). Replaces the removed B-scoop.
+- `BallStore` gained a `Hopper` state. Controller has modes Offline / Host (H) /
+  Client (J), keeps presets 1-5, and T toggles FCC/Random fill.
+- Both shader fixes are the other Kiro's own canonical merge (its compute tile-math
+  rewrite + the `CommonMaterial.hlsl` include).
+
+Setup needed before testing: **Layer 8 must be free** (balls use it; env support
+queries exclude it) — else set `settings.ballLayer`. **Build gotcha:** everything
+is created in code (no scene material asset references URP's Lit), so a build
+strips `Universal Render Pipeline/Lit` and the controller's material creation
+threw in `Start()` → cameraless grey screen in the client build (editor was fine
+because the editor loads all shaders). Fix: add `Universal Render Pipeline/Lit` to
+Project Settings > Graphics > Always Included Shaders. The controller now also
+builds the camera first and falls back to a built-in shader with a clear error if
+Lit is missing, so a stripped shader can never silently grey the whole build again.
+(The three BallPit shaders load via `Resources.Load`, so they already ship.) Status: integrated and
+reviewed for cross-file API consistency; NOT yet compiled/run in Unity. Test plan
+is in `Assets/reball/PROMPT2.md`'s §4 (now deleted with the folder — captured in
+the hand-back report).
+
 **Measured: 1,000,000 balls at ~125 fps** with real physics (grab/throw/collapse),
 exact per-color counts, GPU occlusion culling, and no demote snap. Pit-size
 presets (keys 1-5) go up past 2M. The rendering + physics scaling problem is
@@ -275,11 +317,82 @@ SOLVED.
 `OnThawed`, `OnFrozen(id,pose)`, `OnLost`, `OnRestingChanged`. Ball ids are
 stable, so these are exactly what a save layer and a network layer key on.
 
-### The only remaining perf risks (per the user)
-1. **Networking** — replicating the active set + resting diffs over NGO. This is
-   the big unbuilt piece and the most likely future source of lag. The plan is in
-   the "Networking" section above (CustomMessagingManager, quantize-at-freeze,
-   active snapshots, per-chunk resync). NOT yet started.
+### Milestone 3 integrated (collapse redesign — pending in-Unity test)
+The other Kiro's milestone-3 drop (handoff `Assets/reball (1)/`, now integrated,
+staging deleted) answers the collapse report. Changed: `ActivePhysics`,
+`SupportQueue`, `PitAuthority`, `PitSettings`, `PitWorld`, `GpuBallRenderer`,
+`PitReplica`, `NetPit`, `BallPitFinalController`; new `CollapseTelemetry` (the P
+key). Fixes:
+- **Finding 1b (active set pinned at 1,600):** removed the separate pool size —
+  the rigidbody pool now grows lazily to `maxActive` (default 4000, prewarm 2048),
+  re-read each step. No more `Min(maxActive, poolSize)` clamp.
+- **Never-draining active set:** old freeze rule ("moved <2mm over stillSeconds")
+  never fired in a jittering deep pile. New rule: speed < `freezeSpeed` for
+  `freezeSeconds` with low drift, or PhysX island asleep; plus settle-damping
+  (`settleDrag`/`settleAngularDrag`) so slow balls stop creeping.
+- **Finding 1 (serial collapse):** `SupportQueue` is now a REGIONAL scheduler —
+  vertical columns (`regionSizeDiameters`, 8 default), each lowest-first, drained
+  round-robin so every stretch of a long tunnel collapses concurrently. Plus a
+  **free-fall cascade**: a ball losing support with an open drop below is flagged
+  falling, excluded as a support, and its dependents re-tested the same step, so a
+  roof over a cavity drops together. Budget is now **concurrent rigidbodies only**
+  with an **adaptive cap** (`targetSimulateMs`, self-calibrating per hardware).
+- **Finding 2 (moving balls interactable):** `PitAuthority.IsInteractable` /
+  `GatherInteractable`; `TryGrab` accepts Active balls (hands the live body to the
+  carrier via `SetCarried`, no freeze first), `Excavate` takes moving balls, hover
+  ray-tests the live set (`PitWorld.RaycastSpheres`) on host and client.
+- NetPit → protocol 2 (header carries `maxActive`, not pool size). Auto-log no
+  longer runs the O(N) ledger recount every 2s (was a ~10ms hitch at 2.35M); L
+  still does the full check.
+- Re-applied this repo's pipeline-agnostic shader fix on top (URP/Lit vs built-in
+  Standard), since the other Kiro's controller still used bare `Shader.Find`.
+**✅ VALIDATED in Unity (2026-10):** collapse now looks natural and performs.
+Random fill reads like a real poured pit (walls slump); FCC still available. Holds
+**60+ fps even under heavy vacuum/collapse** on millions of balls — the user
+couldn't make it meaningfully drop with normal tool use. Collapse propagates
+along a whole tunnel concurrently (regional scheduler + free-fall cascade), no
+longer the serial minutes-long crawl. The three milestone-3 findings
+(pinned active set, never-draining pool, serial collapse) are resolved.
+Remaining polish: Random fill has a **slow initial generation** the first time for
+a given pit (tens of seconds; then cached to StreamingAssets) — a known tradeoff,
+candidate for a future bake/speedup. Set inspector `maxColliders>=16000`,
+`linearDrag=0.05`, `angularDrag=1.2`, `sleepThreshold=0.02`, `maxActive=4000`.
+
+> **BOTTOM LINE: the pit is proven.** Rendering, physics feel, exact counting,
+> natural collapse, AND host-authoritative networking all work at millions of
+> balls. The single biggest technical risk of the whole game is retired. What's
+> left is gameplay (containers/sorting/money/upgrades), the Steam-lobby rewrite to
+> feed NetPit, saves, and the real player tools — all built ON this proven base.
+
+### ✅ Networking validated (local UTP, 2026-10)
+`NetPit` host-authoritative replication WORKS: editor-host + Development-Build-client
+over local UnityTransport (127.0.0.1), **1,000,000-ball pit at ~90 fps on BOTH
+instances**, client reached `synced, ledger matches host`, and host grab/throw
+replicated to the client cleanly (client saw the ball move and the throw). This is
+the big unknown de-risked. Still to test: client→host intents under load, a big
+collapse over the wire, join-mid-game, and eventually the real Steam-lobby
+transport (local test used UTP, no Steam). Known collapse throttle (Finding 1/1b in
+the collapse report) is orthogonal and still pending the other Kiro's queue/pool
+redesign.
+
+> **Render-pipeline discrepancy found during this test:** URP 14.0.9 is in
+> `manifest.json`, but there is NO `UniversalRenderPipelineAsset` assigned in
+> Graphics/Quality settings — so the project is actually running the **Built-in**
+> pipeline. That's why `Universal Render Pipeline/Lit` doesn't appear in the
+> Always-Included-Shaders picker. The ball renderer's own shaders (loaded via
+> `Resources.Load`) render regardless, and the controller now picks URP/Lit vs
+> built-in `Standard` based on `GraphicsSettings.currentRenderPipeline`, so the
+> prototype renders correctly either way. BUT the GpuBallRenderer shaders were
+> authored for URP (the `Shadows.hlsl`/`LerpWhiteTo` fix is URP-specific), so the
+> project is in a half-configured state. CLEANUP ITEM: either create+assign a URP
+> asset (Create > Rendering > URP Asset, then set it in Graphics + Quality) to
+> match the stated intent, or formally decide to stay Built-in. Not blocking;
+> bundle with the eventual Phish->final rename pass.
+
+### Remaining perf risks (per the user)
+1. **Networking under load** — the active-set replication proved out at idle/light
+   interaction; still need a big collapse + client intents over the wire, and the
+   real Steam transport. Plan is in the "Networking" section above.
 2. **Bigger tools** (vacuums, drones, mass extraction) that promote/disturb far
    more balls at once — bounded by `maxActive` + `supportThawsPerStep` /
    `impactThawsPerStep`; a huge tool must spread its work or it hits the cap.

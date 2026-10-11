@@ -46,9 +46,11 @@ namespace BallPitFinal
         private readonly Mesh nearMesh, farMesh;
         private readonly float radius;
         private readonly Bounds drawBounds;
-        private readonly int capacity, maxDynamic;
+        private readonly int capacity;
+        private int maxDynamic;
 
-        private readonly ComputeBuffer instances, updates, stats, dynInstances, identityIds;
+        private readonly ComputeBuffer instances, updates, stats;
+        private ComputeBuffer dynInstances, identityIds; // grow on demand (the active set is no longer capped by a pool size)
         private readonly ComputeBuffer[] visNear = new ComputeBuffer[2], visFar = new ComputeBuffer[2];
         private readonly ComputeBuffer[] argsNear = new ComputeBuffer[2], argsFar = new ComputeBuffer[2];
 
@@ -132,11 +134,7 @@ namespace BallPitFinal
                 argsNear[i] = MakeArgs(nearMesh);
                 argsFar[i] = MakeArgs(farMesh);
             }
-            dynInstances = new ComputeBuffer(this.maxDynamic, 16, ComputeBufferType.Structured);
-            identityIds = new ComputeBuffer(this.maxDynamic, 4, ComputeBufferType.Structured);
-            var ident = new uint[this.maxDynamic];
-            for (int i = 0; i < ident.Length; i++) ident[i] = (uint)i;
-            identityIds.SetData(ident);
+            AllocateDynamic(this.maxDynamic);
 
             dirtyList = new int[capacity];
             dirtyFlag = new bool[capacity];
@@ -247,10 +245,22 @@ namespace BallPitFinal
         }
 
         /// <summary>Draw non-resting balls (active / held) from CPU positions. No culling (count is small).</summary>
+        private void AllocateDynamic(int n)
+        {
+            dynInstances?.Release();
+            identityIds?.Release();
+            maxDynamic = Mathf.Max(1, n);
+            dynInstances = new ComputeBuffer(maxDynamic, 16, ComputeBufferType.Structured);
+            identityIds = new ComputeBuffer(maxDynamic, 4, ComputeBufferType.Structured);
+            var ident = new uint[maxDynamic];
+            for (int i = 0; i < ident.Length; i++) ident[i] = (uint)i;
+            identityIds.SetData(ident);
+        }
+
         public void DrawDynamic(Camera cam, BallInstance[] items, int count)
         {
             if (count <= 0) return;
-            count = Mathf.Min(count, maxDynamic);
+            if (count > maxDynamic) AllocateDynamic(Mathf.NextPowerOfTwo(count));
             dynInstances.SetData(items, 0, 0, count);
             mpbDyn.SetBuffer(IdInstances, dynInstances);
             mpbDyn.SetBuffer(IdVisibleIds, identityIds);

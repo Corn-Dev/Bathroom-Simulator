@@ -112,21 +112,16 @@ void CSCull(uint3 t : SV_DispatchThreadID)
                 uvMax.y = 1.0 - uvMin.y;
                 uvMin.y = y0;
             }
-            int2 lim = int2(_TileCount) - 1;
-            // Pixel coords are non-negative (uv is saturated), so use uint shift
-            // by log2(TILE)=3 instead of a signed divide (silences the warning,
-            // and is a cheap shift at 1M invocations).
-            uint2 pxMin = (uint2)max(int2(uvMin * _CullScreen.xy), int2(0, 0));
-            uint2 pxMax = (uint2)max(int2(uvMax * _CullScreen.xy), int2(0, 0));
-            int2 tMin = clamp(int2(pxMin >> 3u), int2(0, 0), lim);
-            int2 tMax = clamp(int2(pxMax >> 3u), int2(0, 0), lim);
-            int2 span = tMax - tMin + 1;
-            if (span.x <= 8 && span.y <= 8)
+            uint2 lim = _TileCount - 1u;
+            uint2 tMin = min(uint2(uvMin * _CullScreen.xy) >> 3u, lim);
+            uint2 tMax = min(uint2(uvMax * _CullScreen.xy) >> 3u, lim);
+            uint2 span = tMax - tMin + 1u;
+            if (span.x <= 8u && span.y <= 8u)
             {
                 float maxD = 0.0;
-                for (int ty = tMin.y; ty <= tMax.y; ty++)
-                    for (int tx = tMin.x; tx <= tMax.x; tx++)
-                        maxD = max(maxD, _TileMax[int2(tx, ty)]);
+                for (uint ty = tMin.y; ty <= tMax.y; ty++)
+                    for (uint tx = tMin.x; tx <= tMax.x; tx++)
+                        maxD = max(maxD, _TileMax[uint2(tx, ty)]);
                 if (nearest > maxD + _DepthBias) return; // fully behind the farthest occluder in its footprint
             }
         }

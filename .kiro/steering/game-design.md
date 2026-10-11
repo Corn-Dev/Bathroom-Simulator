@@ -37,6 +37,10 @@ working default we can revisit cheaply.
 
 ## Sorting & selling
 - A player carries a ball to a container and drops it in. **[DECIDED]**
+- Active (moving) balls ARE interactable — grabbable/vacuumable like any other
+  ball. There is no "wait for it to stop" rule. (The BallPitFinal prototype
+  currently only lets you interact with resting balls; that's an implementation
+  shortcut to fix, not intended behavior.) **[DECIDED]**
 - Correct color container = sell = money to shared pot. **[DECIDED]**
 - Wrong color container = ball returns to the pit. **[DECIDED]**
   - [OPEN] Returns instantly to pit count, or physically ejected back into the

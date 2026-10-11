@@ -3,17 +3,19 @@ using UnityEngine;
 namespace BallPitFinal
 {
     /// <summary>
-    /// Source of truth for every ball. Ids are STABLE for the lifetime of a pit: there is no
-    /// swap-remove. A ball that leaves play changes state (Stored / Lost) instead of being deleted,
-    /// so grids, colliders, the GPU buffer, saves and network messages can all key on the id.
-    /// The ledger (per state, per color) is updated on every transition and is exact by construction.
+    /// Source of truth for every ball. Ids are STABLE for the lifetime of a pit: there is no swap-remove.
+    /// A ball that leaves the pile changes state instead of being deleted, so grids, colliders, the GPU buffer,
+    /// saves and network messages can all key on the id. The ledger (per state, per color) is updated on every
+    /// transition and is exact by construction.
     /// </summary>
     public sealed class BallStore
     {
-        public enum State : byte { Resting = 0, Active = 1, Held = 2, Stored = 3, Lost = 4 }
-        public const int StateCount = 5;
+        /// <summary>Resting: static pose in the pile. Active: pooled rigidbody. Held: in a player's hand.
+        /// Stored: deposited in a sorting container. Lost: fell out of the world. Hopper: inside a player's tool.</summary>
+        public enum State : byte { Resting = 0, Active = 1, Held = 2, Stored = 3, Lost = 4, Hopper = 5 }
+        public const int StateCount = 6;
 
-        public readonly Vector3[] pos;   // exact continuous position (THE truth; for Active balls it is the last physics pose)
+        public readonly Vector3[] pos;   // exact continuous position (for Active balls: the last physics pose)
         public readonly byte[] color;
         public readonly State[] state;
         public readonly int Capacity;
@@ -62,10 +64,10 @@ namespace BallPitFinal
         public int StateTotal(State s) => stateTotals[(int)s];
         public int ColorTotal(int c) => colorTotals[c];
 
-        /// <summary>Balls of color c still in play (not deposited in a container, not lost).</summary>
+        /// <summary>Balls of color c not yet sorted into a container and not lost.</summary>
         public int InPlay(int c) => colorTotals[c] - CountOf(State.Stored, c) - CountOf(State.Lost, c);
 
-        /// <summary>Full recount from the records. Dev-only; O(Count).</summary>
+        /// <summary>Full recount from the records. Dev only; O(Count).</summary>
         public bool VerifyLedger(out string error)
         {
             error = null;

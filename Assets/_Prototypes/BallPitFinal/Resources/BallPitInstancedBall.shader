@@ -116,9 +116,6 @@ Shader "BallPitFinal/InstancedBall"
             #pragma vertex ShadowVert
             #pragma fragment ShadowFrag
             #pragma multi_compile_vertex _ _CASTING_PUNCTUAL_LIGHT_SHADOW
-            // Shadows.hlsl uses LerpWhiteTo (from CommonMaterial.hlsl via Core's
-            // common includes). Core.hlsl in the shared HLSLINCLUDE doesn't always
-            // pull it into this pass's scope, so include it explicitly first.
             #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/CommonMaterial.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Shadows.hlsl"
 
