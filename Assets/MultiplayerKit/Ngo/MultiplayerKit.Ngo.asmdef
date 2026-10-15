@@ -1,0 +1,20 @@
+{
+    "name": "MultiplayerKit.Ngo",
+    "rootNamespace": "MultiplayerKit.Ngo",
+    "references": [
+        "MultiplayerKit.Core",
+        "MultiplayerKit.Steam",
+        "Unity.Netcode.Runtime",
+        "com.rlabrecque.steamworks.net",
+        "SteamNetworkingSockets Transport for Netcode for GameObjects"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

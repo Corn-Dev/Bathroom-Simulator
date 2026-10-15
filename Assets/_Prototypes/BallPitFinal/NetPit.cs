@@ -37,9 +37,9 @@ namespace BallPitFinal
     /// </summary>
     public sealed class NetPit : IPitEvents, System.IDisposable
     {
-        public const byte Protocol = 2; // 2: header carries maxActive (pool size removed)
+        public const byte Protocol = 3; // 2: header carries maxActive. 3: client Hello handshake (header re-send).
         private const string MsgHeader = "BP.Hdr", MsgReady = "BP.Ready", MsgRel = "BP.Rel", MsgSnap = "BP.Snap",
-                             MsgIntent = "BP.Intent", MsgView = "BP.View";
+                             MsgIntent = "BP.Intent", MsgView = "BP.View", MsgHello = "BP.Hello";
         private const byte EvThaw = 1, EvRest = 2, EvGone = 3, EvActive = 4, EvHeld = 5, EvRelease = 6;
         private const byte RelSync = 1, RelSyncDone = 2, RelLive = 3;
         public const byte IntentGrab = 1, IntentThrow = 2, IntentUndermine = 3;
@@ -114,6 +114,7 @@ namespace BallPitFinal
             cmm.RegisterNamedMessageHandler(MsgReady, net.OnReady);
             cmm.RegisterNamedMessageHandler(MsgIntent, net.OnIntent);
             cmm.RegisterNamedMessageHandler(MsgView, net.OnView);
+            cmm.RegisterNamedMessageHandler(MsgHello, net.OnHello);
             nm.OnClientConnectedCallback += net.OnClientConnected;
             nm.OnClientDisconnectCallback += net.OnClientDisconnected;
             return net;
@@ -174,6 +175,18 @@ namespace BallPitFinal
                 w.WriteValueSafe(A.W.FillChecksum);
                 NM.CustomMessagingManager.SendNamedMessage(MsgHeader, link.clientId, w, NetworkDelivery.ReliableFragmentedSequenced);
             }
+        }
+
+        /// <summary>
+        /// Handshake (protocol 3): a client says Hello once its handlers are registered. If the header sent from
+        /// OnClientConnected arrived before the client could receive it (NGO callback / scene-sync ordering), this
+        /// re-sends it, so joining never depends on that ordering. Links are still created only in OnClientConnected,
+        /// so player-slot assignment order is unchanged; a Hello before the link exists is ignored because
+        /// OnClientConnected will send the header after it.
+        /// </summary>
+        private void OnHello(ulong sender, FastBufferReader r)
+        {
+            if (links.TryGetValue(sender, out var link) && !link.streaming) SendHeader(link);
         }
 
         private void OnReady(ulong sender, FastBufferReader r)
@@ -443,11 +456,31 @@ namespace BallPitFinal
             cmm.RegisterNamedMessageHandler(MsgRel, net.OnRel);
             cmm.RegisterNamedMessageHandler(MsgSnap, net.OnSnap);
             nm.OnClientDisconnectCallback += net.OnClientDisconnected;
+            // Handlers are registered: say Hello now (or as soon as the connection is up) so the host (re)sends the header.
+            if (nm.IsConnectedClient) net.SendHello();
+            else nm.OnClientConnectedCallback += net.OnLocalClientConnected;
             return net;
+        }
+
+        private void OnLocalClientConnected(ulong clientId)
+        {
+            if (clientId != NM.LocalClientId) return;
+            NM.OnClientConnectedCallback -= OnLocalClientConnected;
+            SendHello();
+        }
+
+        private void SendHello()
+        {
+            using (var w = new FastBufferWriter(4, Allocator.Temp))
+            {
+                w.WriteValueSafe(Protocol);
+                NM.CustomMessagingManager.SendNamedMessage(MsgHello, NetworkManager.ServerClientId, w, NetworkDelivery.ReliableSequenced);
+            }
         }
 
         private void OnHeader(ulong sender, FastBufferReader r)
         {
+            if (HeaderPending || CW != null) return; // duplicate from the Hello re-send; the first one wins
             r.ReadValueSafe(out byte protocol);
             if (protocol != Protocol) { Debug.LogError($"[BallPitNet] protocol {protocol} != {Protocol}"); return; }
             r.ReadValueSafe(out byte player);
@@ -720,10 +753,11 @@ namespace BallPitFinal
             if (A != null && ReferenceEquals(A.Events, this)) A.Events = null;
             if (NM == null) return;
             NM.OnClientConnectedCallback -= OnClientConnected;
+            NM.OnClientConnectedCallback -= OnLocalClientConnected;
             NM.OnClientDisconnectCallback -= OnClientDisconnected;
             var cmm = NM.CustomMessagingManager;
             if (cmm == null) return;
-            if (IsHost) { cmm.UnregisterNamedMessageHandler(MsgReady); cmm.UnregisterNamedMessageHandler(MsgIntent); cmm.UnregisterNamedMessageHandler(MsgView); }
+            if (IsHost) { cmm.UnregisterNamedMessageHandler(MsgReady); cmm.UnregisterNamedMessageHandler(MsgIntent); cmm.UnregisterNamedMessageHandler(MsgView); cmm.UnregisterNamedMessageHandler(MsgHello); }
             else { cmm.UnregisterNamedMessageHandler(MsgHeader); cmm.UnregisterNamedMessageHandler(MsgRel); cmm.UnregisterNamedMessageHandler(MsgSnap); }
         }
     }

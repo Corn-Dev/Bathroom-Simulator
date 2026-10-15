@@ -28,6 +28,18 @@ namespace BallPitFinal
         public ulong FillChecksum { get; private set; }
         public System.Action<int> OnRestingChanged;
 
+        /// <summary>
+        /// Optional region filter for RegisterSceneEnvironment (default null = today's whole-scene scan). When set,
+        /// colliders whose bounds do not intersect it are not registered. The venue binding sets it before registering.
+        /// </summary>
+        public Bounds? EnvironmentRegion;
+
+        /// <summary>Absolute kill height: the pit floor plus S.killY (identical to S.killY with a zero anchor).</summary>
+        public float KillY => S.pitAnchor.y + S.killY;
+
+        /// <summary>SpatialGrid's linear cell index is an int, so a grid may hold at most this many cells.</summary>
+        public const double MaxGridCells = int.MaxValue;
+
         public int ModifiedCount => modifiedCount;
         public int ModifiedAt(int i) => modifiedList[i];
 
@@ -59,18 +71,14 @@ namespace BallPitFinal
             };
             if (withColliders) Colliders = new ColliderShell(S.maxColliders, capacity, ColliderRadius, Material, S.ballLayer);
             EnvMask = Physics.DefaultRaycastLayers & ~(1 << S.ballLayer);
+            if (S.playerLayer >= 0 && S.playerLayer < 32 && S.playerLayer != S.ballLayer)
+                EnvMask &= ~(1 << S.playerLayer); // players never support balls (-1 = no players, today's mask)
 
             modified = new bool[capacity];
             modifiedList = new int[capacity];
             rayStamp = new int[capacity];
 
-            FccGeometry(S, out float a, out float rowDz, out _, out float ox, out float oz, out float j);
-            float pad = ColliderRadius + 0.002f + j;
-            WallMinX = ox - pad;
-            WallMaxX = ox + (S.pitX + 0.5f) * a + pad;
-            WallMinZ = oz - pad;
-            WallMaxZ = oz + (S.pitZ - 1) * rowDz + 0.5773503f * a + pad;
-            FloorY = 0f;
+            ComputeInterior(S, out WallMinX, out WallMaxX, out WallMinZ, out WallMaxZ, out FloorY);
         }
 
         // ------------------------------------------------------------------ Geometry
@@ -82,14 +90,68 @@ namespace BallPitFinal
             a = dc * 1.002f;
             rowDz = a * 0.8660254f;
             layerH = a * 0.8164966f;
-            ox = -(s.pitX * a) * 0.5f;
-            oz = -(s.pitZ * rowDz) * 0.5f;
+            ox = s.pitAnchor.x + (-(s.pitX * a) * 0.5f);
+            oz = s.pitAnchor.z + (-(s.pitZ * rowDz) * 0.5f);
             jitter = Mathf.Max(0f, (a - dc) * 0.5f / 1.7320508f) * 0.95f * s.jitter;
         }
+
+        /// <summary>The constructor's ColliderRadius for these settings (same operand order, so the same bits).</summary>
+        public static float ColliderRadiusOf(PitSettings s) => s.ballDiameter * 0.5f * s.colliderRadiusScale;
+
+        /// <summary>
+        /// The exact pit interior the simulation uses: wall planes and floor height. The constructor calls this, and the
+        /// venue gizmo, validator and collision proxies use it, so all of them agree with the simulation.
+        /// </summary>
+        public static void ComputeInterior(PitSettings s, out float wallMinX, out float wallMaxX, out float wallMinZ,
+                                           out float wallMaxZ, out float floorY)
+        {
+            FccGeometry(s, out float a, out float rowDz, out _, out float ox, out float oz, out float j);
+            float pad = ColliderRadiusOf(s) + 0.002f + j;
+            wallMinX = ox - pad;
+            wallMaxX = ox + (s.pitX + 0.5f) * a + pad;
+            wallMinZ = oz - pad;
+            wallMaxZ = oz + (s.pitZ - 1) * rowDz + 0.5773503f * a + pad;
+            floorY = s.pitAnchor.y;
+        }
+
+        /// <summary>
+        /// Upper bound on FillFcc's highest ball center (exact to within the jitter plus one Q21 quantum). Editor tools only.
+        /// </summary>
+        public static float PredictFccFillTop(PitSettings s)
+        {
+            FccGeometry(s, out _, out _, out float layerH, out _, out _, out float j);
+            return s.pitAnchor.y + (ColliderRadiusOf(s) + (s.pitY - 1) * layerH) + (s.pitY > 1 ? j : 0f);
+        }
+
+        /// <summary>SpatialGrid's cell count (Nx * Ny * Nz) for a box, in double so it cannot overflow.</summary>
+        public static double GridCellCount(Vector3 size, float cellSize) =>
+            Cells(size.x, cellSize) * Cells(size.y, cellSize) * Cells(size.z, cellSize);
+
+        private static double Cells(float v, float cellSize) =>
+            System.Math.Max(1.0, System.Math.Ceiling((double)(v * (1f / cellSize))));
+
+        /// <summary>A play-bounds override the Quantizer and both grids can use at diameter d.</summary>
+        private static bool IsUsableOverride(Bounds b, float d)
+        {
+            Vector3 c = b.center, z = b.size;
+            if (!Finite(c.x) || !Finite(c.y) || !Finite(c.z)) return false;
+            if (!Finite(z.x) || !Finite(z.y) || !Finite(z.z) || z.x <= 0f || z.y <= 0f || z.z <= 0f) return false;
+            if (!Finite(d) || d <= 0f) return false;
+            return GridCellCount(z, d) <= MaxGridCells;
+        }
+
+        private static bool Finite(float v) => !float.IsNaN(v) && !float.IsInfinity(v);
 
         /// <summary>Deterministic play bounds for these settings (the host sends the exact result to clients).</summary>
         public static Bounds ComputeBounds(PitSettings s)
         {
+            if (s.overridePlayBounds)
+            {
+                if (IsUsableOverride(s.playBoundsOverride, s.ballDiameter)) return s.playBoundsOverride;
+                Debug.LogError($"[PitWorld] playBoundsOverride {s.playBoundsOverride} is not usable at ball diameter " +
+                               $"{s.ballDiameter} ({GridCellCount(s.playBoundsOverride.size, s.ballDiameter):0} grid cells, " +
+                               $"max {MaxGridCells:0}; or a non-finite or empty box). Using the computed bounds.");
+            }
             FccGeometry(s, out float a, out float rowDz, out float layerH, out float ox, out float oz, out _);
             float w = (s.pitX + 1.5f) * a + 2f, dz = (s.pitZ + 1) * rowDz + 2f;
             float n = (float)s.pitX * s.pitY * s.pitZ;
@@ -100,7 +162,7 @@ namespace BallPitFinal
             float span = Mathf.Max(w, dz) * 3f + 20f;
             float cx = ox + (s.pitX + 0.5f) * a * 0.5f, cz = oz + s.pitZ * rowDz * 0.5f;
             const float below = 10f, above = 20f;
-            return new Bounds(new Vector3(cx, (h + above - below) * 0.5f, cz), new Vector3(span, h + above + below, span));
+            return new Bounds(new Vector3(cx, s.pitAnchor.y + ((h + above - below) * 0.5f), cz), new Vector3(span, h + above + below, span));
         }
 
         // ------------------------------------------------------------------ Fill
@@ -117,7 +179,7 @@ namespace BallPitFinal
             {
                 int k = y % 3;
                 float lx = k * a * 0.5f, lz = k * a * 0.28867513f;
-                float py0 = ColliderRadius + y * layerH;
+                float py0 = FloorY + (ColliderRadius + y * layerH);
                 for (int z = 0; z < S.pitZ; z++)
                 {
                     float rowX = (z & 1) == 1 ? a * 0.5f : 0f;
@@ -143,7 +205,7 @@ namespace BallPitFinal
         {
             const ulong FnvOffset = 14695981039346656037UL, FnvPrime = 1099511628211UL;
             ulong h = FnvOffset;
-            float maxY = 0f;
+            float maxY = FloorY;
             for (int id = 0; id < Store.Count; id++)
             {
                 ulong q = Q.Encode(Store.pos[id]);
@@ -153,21 +215,21 @@ namespace BallPitFinal
             }
             FillChecksum = h;
             WallTop = maxY + Diameter * 2f;
-            PitCenter = new Vector3((WallMinX + WallMaxX) * 0.5f, maxY * 0.5f, (WallMinZ + WallMaxZ) * 0.5f);
-            PitSize = new Vector3(WallMaxX - WallMinX, maxY + ColliderRadius, WallMaxZ - WallMinZ);
+            PitCenter = new Vector3((WallMinX + WallMaxX) * 0.5f, (FloorY + maxY) * 0.5f, (WallMinZ + WallMaxZ) * 0.5f);
+            PitSize = new Vector3(WallMaxX - WallMinX, (maxY - FloorY) + ColliderRadius, WallMaxZ - WallMinZ);
             if (S.pitWalls) BuildWalls(wallMaterial);
         }
 
         private void BuildWalls(Material mat)
         {
             const float t = 1f;
-            float height = WallTop;
+            float height = WallTop - FloorY;
             float lenX = WallMaxX - WallMinX + 2f * t, lenZ = WallMaxZ - WallMinZ + 2f * t;
             float cx = PitCenter.x, cz = PitCenter.z;
-            MakeWall(new Vector3(WallMinX - t * 0.5f, height * 0.5f, cz), new Vector3(t, height, lenZ), mat);
-            MakeWall(new Vector3(WallMaxX + t * 0.5f, height * 0.5f, cz), new Vector3(t, height, lenZ), mat);
-            MakeWall(new Vector3(cx, height * 0.5f, WallMinZ - t * 0.5f), new Vector3(lenX, height, t), mat);
-            MakeWall(new Vector3(cx, height * 0.5f, WallMaxZ + t * 0.5f), new Vector3(lenX, height, t), mat);
+            MakeWall(new Vector3(WallMinX - t * 0.5f, FloorY + height * 0.5f, cz), new Vector3(t, height, lenZ), mat);
+            MakeWall(new Vector3(WallMaxX + t * 0.5f, FloorY + height * 0.5f, cz), new Vector3(t, height, lenZ), mat);
+            MakeWall(new Vector3(cx, FloorY + height * 0.5f, WallMinZ - t * 0.5f), new Vector3(lenX, height, t), mat);
+            MakeWall(new Vector3(cx, FloorY + height * 0.5f, WallMaxZ + t * 0.5f), new Vector3(lenX, height, t), mat);
         }
 
         private void MakeWall(Vector3 center, Vector3 size, Material mat)
@@ -241,7 +303,9 @@ namespace BallPitFinal
             foreach (Collider c in Object.FindObjectsOfType<Collider>())
             {
                 if (!c.enabled || c.isTrigger || c.gameObject.layer == S.ballLayer) continue;
+                if (S.playerLayer >= 0 && c.gameObject.layer == S.playerLayer) continue; // players never support balls
                 if (c.attachedRigidbody != null && !c.attachedRigidbody.isKinematic) continue; // moving props are not static support
+                if (EnvironmentRegion.HasValue && !EnvironmentRegion.Value.Intersects(c.bounds)) continue; // venue region filter
                 envBounds.Add(c.bounds);
             }
         }

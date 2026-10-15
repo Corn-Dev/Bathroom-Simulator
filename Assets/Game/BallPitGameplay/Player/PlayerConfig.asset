@@ -1,0 +1,99 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: abcdd4667dec002498f2e75022bf2d74, type: 3}
+  m_Name: PlayerConfig
+  m_EditorClassIdentifier: 
+  capsuleHeight: 1.8
+  capsuleRadius: 0.35
+  eyeHeight: 1.62
+  holdOffset: {x: 0.25, y: -0.28, z: 0.55}
+  stepHeight: 0.35
+  stepMinHeight: 0.02
+  mantleMinHeight: 0.3
+  mantleMaxHeight: 1.3
+  reach: 4
+  mass: 60
+  solverIterations: 8
+  maxDepenetrationVelocity: 4
+  excludedLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  walkSpeed: 4.5
+  sprintMultiplier: 1.6
+  allowSprint: 1
+  groundAcceleration: 60
+  groundDeceleration: 70
+  airAcceleration: 12
+  airDeceleration: 1
+  gravityScale: 2
+  maxFallSpeed: 35
+  jumpHeight: 1.1
+  coyoteTime: 0.12
+  jumpBuffer: 0.12
+  slopeLimit: 50
+  groundProbeRadiusScale: 0.9
+  groundSnapDistance: 0.45
+  maxSnapSpeed: 12
+  climbSpeed: 3
+  climbStrafeFactor: 0.8
+  climbAttachInput: 0.5
+  climbMaxFacingAngle: 60
+  climbMaxNormalY: 0.35
+  climbStickSpeed: 0.6
+  climbReleaseDelay: 0.35
+  wallJumpOffSpeed: 4.5
+  wallJumpUpSpeed: 5
+  wallReattachLockout: 0.35
+  climbProbeHeightFraction: 0.55
+  climbProbeRadiusFraction: 0.85
+  climbProbeReach: 0.15
+  climbLostSeconds: 0.1
+  mantleForwardReach: 0.6
+  ledgeProbeRadius: 0.15
+  mantleDurationBase: 0.22
+  mantleDurationPerMeter: 0.18
+  mantleExitSpeed: 1.5
+  mantleLockoutSeconds: 0.2
+  mantleRiseFraction: 0.6
+  wedgeOpposingDot: -0.3
+  ceilingNormalY: -0.3
+  teleportLiftStep: 0.25
+  teleportLiftMax: 2
+  scrambleUpSpeed: 6
+  scrambleForwardSpeed: 2.5
+  scrambleCooldown: 0.3
+  scrambleGrace: 0.15
+  scrambleOnHold: 1
+  stuckProgressDistance: 0.1
+  stuckSeconds: 1.5
+  unstickUpSpeed: 4
+  unstickForwardSpeed: 2
+  unstickNormalSpeed: 1.5
+  maxDepenetrationPerAttempt: 0.6
+  unstickAttemptsBeforeOffer: 3
+  attemptWindowSeconds: 12
+  escapeDistance: 1.5
+  respawnCooldown: 3
+  respawnRequiresOffer: 0
+  fallBelowFloor: 5
+  respawnOutsidePlayBounds: 1
+  throwSpeed: 12
+  throwUpBias: 2.5
+  throwInheritsVelocity: 1
+  shellSlack: 0.05
+  groundCover: 0.1
+  pitchLimit: 85
+  eyeSmoothTime: 0.08
+  groundNormalSmoothTime: 0.15
+  holdClearance: 0.03
+  playersDisturbPile: 0
+  pileDisturbSpeed: 1.5

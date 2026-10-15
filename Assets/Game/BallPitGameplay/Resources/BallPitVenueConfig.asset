@@ -1,0 +1,66 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 98a2a957ee0acc44390ed06cb413b8ab, type: 3}
+  m_Name: BallPitVenueConfig
+  m_EditorClassIdentifier: 
+  profiles:
+  - key: small
+    displayName: Small
+    pitX: 40
+    pitY: 25
+    pitZ: 40
+    ballDiameter: 0.5
+    recommendedPlayersMin: 1
+    recommendedPlayersMax: 4
+    estimatedPlayTime: 
+    notes: 
+  - key: medium
+    displayName: Medium
+    pitX: 60
+    pitY: 40
+    pitZ: 60
+    ballDiameter: 0.5
+    recommendedPlayersMin: 1
+    recommendedPlayersMax: 4
+    estimatedPlayTime: 
+    notes: 
+  - key: large
+    displayName: Large
+    pitX: 80
+    pitY: 60
+    pitZ: 80
+    ballDiameter: 0.5
+    recommendedPlayersMin: 1
+    recommendedPlayersMax: 4
+    estimatedPlayTime: 
+    notes: 
+  - key: huge
+    displayName: Huge
+    pitX: 100
+    pitY: 100
+    pitZ: 100
+    ballDiameter: 0.5
+    recommendedPlayersMin: 1
+    recommendedPlayersMax: 4
+    estimatedPlayTime: 
+    notes: 
+  - key: giant
+    displayName: Giant
+    pitX: 133
+    pitY: 133
+    pitZ: 133
+    ballDiameter: 0.5
+    recommendedPlayersMin: 1
+    recommendedPlayersMax: 4
+    estimatedPlayTime: 
+    notes: 
+  defaultProfileKey: large

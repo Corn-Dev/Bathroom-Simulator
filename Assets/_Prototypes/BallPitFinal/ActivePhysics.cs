@@ -19,6 +19,7 @@ namespace BallPitFinal
             public SphereCollider col;
             public bool carried, teleport, damped;
             public Vector3 prev, curr, eventPose, stillAnchor, lastSourcePos;
+            public Vector3 velEma; // low-passed displacement velocity: solver jitter (high frequency) cancels out
             public float stillTime;
             public int lastSourceStep;
         }
@@ -35,6 +36,8 @@ namespace BallPitFinal
         // Settling damping (rolling resistance for slow balls); set live from PitSettings.
         public float SettleSpeed = 0.25f, SettleDrag = 1f, SettleAngularDrag = 6f;
         public float LinearDrag, AngularDrag;
+        /// <summary>Time constant of the smoothed (displacement) velocity used by the freeze and damping rules.</summary>
+        public float SpeedSmoothingSeconds = 0.1f;
 
         private Body[] bodies;
         private int count, created;
@@ -106,6 +109,28 @@ namespace BallPitFinal
             return bodies[idx].rb.velocity;
         }
 
+        /// <summary>Smoothed speed (low-passed displacement velocity). Use this, not rb.velocity, to decide "is it still".</summary>
+        public float SmoothedSpeedAt(int i) => bodies[i].carried ? 0f : bodies[i].velEma.magnitude;
+
+        public float SmoothedSpeedOf(int id)
+        {
+            int idx = bodyOfBall[id];
+            return idx < 0 ? 0f : SmoothedSpeedAt(idx);
+        }
+
+        /// <summary>The collider of a live (active or held) ball, or null. Pooled: after Demote the same collider serves
+        /// another ball, so never keep it past BeforeDemote.</summary>
+        public SphereCollider ColliderOf(int id)
+        {
+            if ((uint)id >= (uint)bodyOfBall.Length) return null;
+            int idx = bodyOfBall[id];
+            return idx < 0 ? null : bodies[idx].col;
+        }
+
+        /// <summary>Optional, default null. Invoked at the start of Demote, while the ball's collider is still enabled.
+        /// Must not change pit state (no Promote/Demote/transition calls).</summary>
+        public System.Action<int, SphereCollider> BeforeDemote;
+
         public bool Promote(int id, Vector3 p, Vector3 velocity, bool carried)
         {
             if (count >= MaxActive || bodyOfBall[id] >= 0) return false;
@@ -125,6 +150,7 @@ namespace BallPitFinal
             {
                 id = id, rb = rb, col = pk.col, carried = carried, teleport = carried,
                 prev = p, curr = p, eventPose = p, stillAnchor = p, lastSourcePos = p,
+                velEma = carried ? Vector3.zero : velocity,
                 stillTime = 0f, lastSourceStep = int.MinValue / 2
             };
             bodyOfBall[id] = count++;
@@ -136,6 +162,7 @@ namespace BallPitFinal
         {
             int idx = bodyOfBall[id];
             if (idx < 0) return Vector3.zero;
+            BeforeDemote?.Invoke(id, bodies[idx].col);
             Rigidbody rb = bodies[idx].rb;
             SphereCollider col = bodies[idx].col;
             Vector3 pose = rb.position;
@@ -163,6 +190,7 @@ namespace BallPitFinal
             b.rb.isKinematic = true;
             b.carried = true;
             b.teleport = true;
+            b.velEma = Vector3.zero;
         }
 
         /// <summary>Kinematic follow for a held ball. First move after grabbing is a teleport (no sweep through the pile).</summary>
@@ -191,6 +219,7 @@ namespace BallPitFinal
             b.rb.velocity = velocity;
             b.rb.angularVelocity = Vector3.zero;
             b.eventPose = b.stillAnchor = b.rb.position;
+            b.velEma = velocity;
             b.stillTime = 0f;
             b.damped = false;
             b.rb.drag = LinearDrag;
@@ -214,9 +243,9 @@ namespace BallPitFinal
         /// After Physics.Simulate: copy poses into the store + live grid; emit motion events (moved more than
         /// moveThreshold since the last event; the OLD pose is reported because that is where it supported others);
         /// apply settling damping to slow balls; collect freeze candidates.
-        /// Freeze rule (robust to solver jitter in deep piles): PhysX island asleep, OR speed below freezeSpeed for
-        /// freezeSeconds while drifting less than maxStillDrift. The old rule (moved less than 2 mm over 1 s) never
-        /// fired in a jittering 1,600-ball heap, so the pool stayed full for minutes.
+        /// Freeze rule (robust to solver jitter in deep piles): PhysX island asleep, OR SMOOTHED speed below freezeSpeed
+        /// for freezeSeconds while drifting less than maxStillDrift. Both earlier rules (2 mm over 1 s; then instantaneous
+        /// rb.velocity) were defeated by high-frequency jitter in packed piles, which stalled the active set.
         /// </summary>
         public void PostStep(float dt, float moveThreshold, float freezeSpeed, float freezeSeconds, float maxStillDrift,
                              BallStore store, SpatialGrid liveGrid,
@@ -224,6 +253,8 @@ namespace BallPitFinal
         {
             float move2 = moveThreshold * moveThreshold, fs2 = freezeSpeed * freezeSpeed, drift2 = maxStillDrift * maxStillDrift;
             float enter2 = SettleSpeed * SettleSpeed, exit2 = enter2 * 2.25f;
+            float invDt = 1f / Mathf.Max(1e-5f, dt);
+            float alpha = 1f - Mathf.Exp(-dt / Mathf.Max(1e-3f, SpeedSmoothingSeconds));
             for (int i = 0; i < count; i++)
             {
                 ref Body b = ref bodies[i];
@@ -241,7 +272,10 @@ namespace BallPitFinal
                     b.eventPose = p;
                 }
 
-                float v2 = b.rb.velocity.sqrMagnitude;
+                // Smoothed displacement velocity, NOT rb.velocity: in a packed pile the solver jitters at high frequency, so
+                // the instantaneous velocity stays above any sane threshold while the ball goes nowhere (milestone-3 stall).
+                b.velEma = Vector3.LerpUnclamped(b.velEma, (p - b.prev) * invDt, alpha);
+                float v2 = b.velEma.sqrMagnitude;
                 bool slow = b.damped ? v2 < exit2 : v2 < enter2;
                 if (slow != b.damped)
                 {

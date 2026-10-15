@@ -14,6 +14,36 @@ default we can revisit.
 > Companion to `product.md` and `game-design.md`. Those two reference this file
 > for "why the pit is data, not thousands of objects." This is that doc.
 
+> **STATUS (2026-10): Phase A WORKING in-editor (host single-player).** First-person
+> spawn, WASD/look/jump/sprint, drop into pit, stand on pile, wall-climb + mantle
+> (incl. while carrying), grab/drop/throw with crosshair tint + highlight — all pass.
+> `check=OK`. Empty Game-Adapter slot on the bootstrap is CORRECT (the installer
+> SetAdapter at -1000 feeds it). Validator 4 errors = unbuilt sizes (only large_1
+> built) — expected. NOT yet tested: multiplayer (no 2nd machine) and standalone
+> builds. Test findings triaged:
+> - EDITOR-ONLY (ignore): balls turn black after editor focus loss/regain — GPU
+>   instance buffer context loss; should not happen in a build (confirm in a build).
+> - BY DESIGN (not bugs): (a) balls aren't pushed when standing ON TOP of the pile
+>   — resting balls are static colliders; `PlayerConfig.playersDisturbPile` is a seam
+>   (default off, unimplemented, A36) for optional footstep-scatter later. (b) The
+>   pit/wall GAP — the pit's REAL collision walls are invisible proxies built from
+>   the fill geometry (hug the ball mass); authored art walls are decorative. Author
+>   walls to the cyan interior gizmo and tighten venueBounds (Fit Venue Bounds To
+>   Pit) so balls don't rest in empty floor. Venue authoring is pit-dimensions-FIRST,
+>   art-second.
+> - REAL, LATER TUNING: walking on the pile feels sticky/snagged (motor catching on
+>   0.5m sphere colliders) — a PlayerConfig/motor-feel pass.
+> - MEDIUM (carry-mantle stall) did NOT reproduce this test.
+
+> **Networking still unverified for the Steam transport only.** Replication + lobby
+> are proven locally (UTP, 90fps both instances; host-path session test). A VM
+> CANNOT test this (no real GPU → the GPU-driven renderer returns garbage and
+> crashes). Needs a 2nd real machine (+ 2nd Steam account) or a friend. The Steam
+> transport is the lowest-risk piece (the Phish foundation already shipped on it).
+>
+> **Release-readiness item (later):** `GpuBallRenderer` throws (black screen) when
+> compute/GPU is unsupported — add a graceful "GPU not supported" check before ship.
+
 ---
 
 ## The core problem
@@ -233,18 +263,13 @@ JsonUtility numeric array). Active balls saved with velocity, thawed on load.
 
 ## ✅ CURRENT STATUS — the pit is BUILT and VALIDATED [DECIDED]
 
-> **Who drives implementation (read this first, Kiro).** A stronger Kiro instance
-> on a **separate computer** (no access to this repo) leads the hard
-> implementation work. It produced the GPU-driven rewrite in `BallPitFinal` and
-> did substantially better than this repo's Kiro. **This repo's Kiro's primary
-> role is to APPLY the changes that Kiro hands over (usually dropped into a
-> staging folder in `Assets/`) and to RELAY information back** (status, build
-> errors, measurements, questions). Any other Kiro instance on this computer:
-> assume the same split — prefer integrating/validating the other Kiro's work and
-> relaying accurate findings over re-architecting `BallPitFinal` from scratch.
-> When the other Kiro's code lands, your job is: read it fully, integrate it into
-> `BallPitFinal/`, fix only what's needed to compile under Unity 2022.3.14 LTS +
-> URP 14.0.9 + NGO 1.7.1, verify, and report back precisely.
+> **History note (no longer applies):** much of `BallPitFinal` and the delivered
+> `MultiplayerKit`/players were produced by an external "strong Kiro" on a separate
+> machine that handed over code for this repo to integrate. **That arrangement is
+> OVER (2026-10).** Work is now done directly in this repo by various Kiro sessions
+> (+ sometimes browser Claude). A fresh session OWNS the code — read it, change it,
+> extend it; you are not just an integrator relaying to someone else. The milestone
+> notes below are kept as an accurate PAST-TENSE record of how the code got here.
 
 The working implementation lives in **`Assets/_Prototypes/BallPitFinal/`**. This
 is the real foundation; the other `_Prototypes` folders (`BallPitVoxel`,
@@ -346,7 +371,43 @@ key). Fixes:
   still does the full check.
 - Re-applied this repo's pipeline-agnostic shader fix on top (URP/Lit vs built-in
   Standard), since the other Kiro's controller still used bare `Shader.Find`.
-**✅ VALIDATED in Unity (2026-10):** collapse now looks natural and performs.
+> **COLLAPSE STALL — FIX APPLIED (2026-10, pending in-Unity re-test).** The
+> intermittent deadlock (adaptive cap blocks thaws while the freeze rule can't
+> retire near-idle rigidbodies, so `live` can neither grow nor shrink) is fixed by
+> the strong Kiro's Part A: the freeze/settle rules now use a SMOOTHED velocity
+> (`speedSmoothingSeconds`, EMA) so solver jitter cancels out, plus a STALL BREAKER
+> (`PressureFreeze`) that force-freezes the slowest balls bottom-up whenever thawing
+> is blocked and almost nothing is freezing — so demotion can always make progress.
+> New tunables in `PitSettings`: `speedSmoothingSeconds`, `stallBreakSteps`,
+> `stallMinFreezesPerStep`, `pressureFreezeSpeed`, `pressureFreezePerStep`. P
+> telemetry gains `pressureFreezes/step`, `stallSteps`, `totalPressureFreezes`.
+> `NetPit` is now protocol 3 (client `BP.Hello` handshake → header re-send, so
+> joining no longer depends on callback ordering). Re-test: same repro, confirm
+> `freezes/step > 0` and the queue drains; pressure-freezing should be rare.
+> (The original write-up's staging folder has been deleted; this summary is the
+> record. The collapse stall is FIXED and integrated.)
+
+> **Lobby layer (MultiplayerKit) — NOW INTEGRATED** (this block is kept as history;
+> see the top-of-file STATUS for current truth). The lobby/session package (~116
+> files, 4 asmdefs, host save/resume, friends list + public browser + password +
+> kick + mid-game join) was delivered, APPROVED, and is in `Assets/MultiplayerKit/`
+> + `Assets/Game/BallPitSession/`. The owner is wiring its UI prefabs. It was
+> integrated in phases: Phase 1 (stall fix) DONE; Phase 2 (code integration) DONE;
+> Phase 3 = build scenes/prefabs in-editor (HANDOFF §7) + two-account test.
+>
+> **Phase 2 done (2026-10):** `Assets/MultiplayerKit/` (104 files, 4 asmdefs) and
+> `Assets/Game/BallPitSession/` (12 adapter files) copied in; the 4 LobbyDelivery
+> pit files swapped into `_Prototypes/BallPitFinal/` (controller + `.Session.cs`,
+> PitAuthority + `.Restore.cs`), with our `runInBackground`/`vSyncCount` dev
+> settings re-applied on top. The old lobby cluster (SteamLobby, MainMenuUI,
+> NgoSessionCoordinator, MultiplayerContracts, the SessionState asmdef, etc. — 18
+> files) deleted; kept movement/camera/voice/save/spawn + `SteamManager`. asmdef
+> names already matched (`com.rlabrecque.steamworks.net`, `SteamNetworkingSockets
+> Transport for Netcode for GameObjects`) — no placeholder edits, no fallback
+> needed. URP asset now assigned in the project (pipeline discrepancy resolved).
+> Phase 3 walkthrough for the user is `PHASE3_UNITY_SETUP.md` at the project root.
+
+**✅ MOSTLY VALIDATED in Unity (2026-10) — see the stall bug above:** collapse looks natural and performs.
 Random fill reads like a real poured pit (walls slump); FCC still available. Holds
 **60+ fps even under heavy vacuum/collapse** on millions of balls — the user
 couldn't make it meaningfully drop with normal tool use. Collapse propagates

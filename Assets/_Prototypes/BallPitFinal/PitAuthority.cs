@@ -31,7 +31,7 @@ namespace BallPitFinal
     ///  * Freeze is jitter-robust (slow for freezeSeconds) and slow balls get settle drag, so the active set drains.
     ///  * Interaction: grab/vacuum accept moving balls (the same body is handed to the hand / removed).
     /// </summary>
-    public sealed class PitAuthority : System.IDisposable
+    public sealed partial class PitAuthority : System.IDisposable
     {
         public const int MaxPlayers = 4;
 
@@ -40,6 +40,26 @@ namespace BallPitFinal
         public readonly BallStore Store;
         public readonly ActivePhysics Active;
         public IPitEvents Events;
+
+        // Optional gameplay hooks (host only). Each defaults to null = today's behavior; a null hook costs one check.
+
+        /// <summary>
+        /// Optional host grab validation (player, ball id), checked first in TryGrab, before its own checks; false
+        /// rejects the grab silently. NetPit's intent handler calls TryGrab for client grabs, so it must not throw.
+        /// </summary>
+        public System.Func<int, int, bool> GrabFilter;
+
+        /// <summary>
+        /// Optional gameplay hook, host only. Default null = today's behavior, bit for bit. FreezeBottomUp and
+        /// PressureFreeze call it just before a live ball would freeze, with the ball id and its post-step pose.
+        /// Return true to keep the ball Active this step. ActivePhysics.PostStep makes it a candidate again next
+        /// step, so it is simply asked again. Must be cheap, must not throw, must not change pit state.
+        /// </summary>
+        public System.Func<int, Vector3, bool> FreezeBlocker;
+
+        /// <summary>Optional. Consulted at the top of Excavate and Dump, right after the range check; false makes the call
+        /// return 0. Null (default) = unchanged behavior.</summary>
+        public System.Func<int, bool> ToolFilter;
 
         public int StepIndex { get; private set; }
         public readonly int[] HeldId = { -1, -1, -1, -1 };
@@ -51,6 +71,10 @@ namespace BallPitFinal
 
         // Per-step stats
         public int StatSupportThaws, StatImpactThaws, StatFreezes, StatMotionEvents, StatSupportChecks, StatFreeFall, StatRegionsVisited;
+        public int StatPressureFreezes;
+        /// <summary>Consecutive steps where thawing was blocked and almost nothing froze (the milestone-3 deadlock signature).</summary>
+        public int StallSteps { get; private set; }
+        public int TotalPressureFreezes;
         public bool StatBudgetBlocked, StatAdaptiveBlocked, StatTimeBudgetHit;
         public double LastSimulateMs, LastStepMs, LastDrainMs;
         public float SimMsEma { get; private set; }
@@ -62,10 +86,12 @@ namespace BallPitFinal
         private readonly int[] fallingStep;
         private int fallingMarkSteps = 10;
         private readonly List<int>[] hopper = new List<int>[MaxPlayers];
+        private int parkedCount; // slot 0's protected prefix: absent players' parked tanks (PitAuthority.Restore.cs)
         private readonly List<int> scratchA = new List<int>(512), scratchB = new List<int>(256), scratchC = new List<int>(256);
         private readonly List<int> movedIds = new List<int>(4096), freezeCands = new List<int>(4096), lostIds = new List<int>(64);
         private readonly List<Vector3> movedFrom = new List<Vector3>(4096), removedFrom = new List<Vector3>(1024);
         private readonly List<int> removedIds = new List<int>(1024);
+        private readonly List<int> pressureCands = new List<int>(4096);
         private readonly List<Vector4> toolSources = new List<Vector4>(8);
         private readonly float[] angles = new float[40];
         private float[] sortKeys = new float[1024];
@@ -116,7 +142,7 @@ namespace BallPitFinal
 
         public void ResetCounters()
         {
-            TotalLost = TotalThaws = TotalFreezes = TotalExcavated = TotalSpawned = HangMaxSteps = HangCount = 0;
+            TotalLost = TotalThaws = TotalFreezes = TotalExcavated = TotalSpawned = HangMaxSteps = HangCount = TotalPressureFreezes = 0;
             HangSumSteps = 0;
             W.Colliders.ResetCapHits();
         }
@@ -154,6 +180,7 @@ namespace BallPitFinal
 
         public bool TryGrab(int player, int id)
         {
+            if (GrabFilter != null && !GrabFilter(player, id)) return false;
             if ((uint)player >= MaxPlayers || HeldId[player] >= 0) return false;
             if ((uint)id >= (uint)Store.Count) return false;
             BallStore.State st = Store.state[id];
@@ -197,6 +224,7 @@ namespace BallPitFinal
         public int Excavate(int player, Vector3 center, float radius, int max)
         {
             if ((uint)player >= MaxPlayers || max <= 0) return 0;
+            if (ToolFilter != null && !ToolFilter(player)) return 0;
             GatherInteractable(center, radius, scratchA, S.vacuumActiveBalls);
             int n = scratchA.Count;
             if (n == 0) return 0;
@@ -223,11 +251,12 @@ namespace BallPitFinal
         public int Dump(int player, Vector3 point, int max)
         {
             if ((uint)player >= MaxPlayers) return 0;
+            if (ToolFilter != null && !ToolFilter(player)) return 0;
             var h = hopper[player];
             int n = 0;
             float clear = W.ColliderRadius * 2.02f;
             Active.MaxActive = S.maxActive;
-            while (n < max && h.Count > 0 && Active.CanPromote)
+            while (n < max && h.Count > (player == 0 ? parkedCount : 0) && Active.CanPromote)
             {
                 Vector3 p = default;
                 bool placed = false;
@@ -272,12 +301,14 @@ namespace BallPitFinal
             sw.Restart();
             StepIndex++;
             StatSupportThaws = StatImpactThaws = StatFreezes = StatMotionEvents = StatSupportChecks = StatFreeFall = StatRegionsVisited = 0;
+            StatPressureFreezes = 0;
             StatBudgetBlocked = StatAdaptiveBlocked = StatTimeBudgetHit = false;
 
             // live tuning
             Active.MaxActive = S.maxActive;
             Active.LinearDrag = S.linearDrag; Active.AngularDrag = S.angularDrag;
             Active.SettleSpeed = S.settleSpeed; Active.SettleDrag = S.settleDrag; Active.SettleAngularDrag = S.settleAngularDrag;
+            Active.SpeedSmoothingSeconds = S.speedSmoothingSeconds;
             fallingMarkSteps = Mathf.Max(1, Mathf.RoundToInt(S.fallingMarkSeconds / dt));
 
             for (int p = 0; p < MaxPlayers; p++) if (HeldId[p] >= 0) Active.MoveHeld(HeldId[p], HandTarget[p]);
@@ -299,7 +330,15 @@ namespace BallPitFinal
 
             FreezeBottomUp();
 
-            for (int i = 0; i < Active.Count; i++) if (Active.PosAt(i).y < S.killY) lostIds.Add(Active.IdAt(i));
+            // Stall breaker: the adaptive cap only throttles THAWING; demotion must always make progress. If thawing is
+            // blocked (budget or physics over target) while almost nothing freezes, force-freeze the slowest supported balls.
+            bool pressured = (StatBudgetBlocked && queue.Count > 0) ||
+                             (S.targetSimulateMs > 0f && SimMsEma > S.targetSimulateMs && Active.Count >= S.minActive);
+            if (pressured && StatFreezes < S.stallMinFreezesPerStep) StallSteps++; else StallSteps = 0;
+            if (StallSteps >= S.stallBreakSteps) PressureFreeze();
+
+            float killY = W.KillY; // pit floor + S.killY (== S.killY with a zero anchor)
+            for (int i = 0; i < Active.Count; i++) if (Active.PosAt(i).y < killY) lostIds.Add(Active.IdAt(i));
             for (int i = 0; i < lostIds.Count; i++) Lose(lostIds[i]);
 
             int keepSteps = Mathf.Max(1, Mathf.RoundToInt(S.colliderKeepSeconds / dt));
@@ -590,7 +629,46 @@ namespace BallPitFinal
                 for (int k = 0; k < scratchA.Count; k++)
                     if (Store.pos[scratchA[k]].y < p.y - dy) { liveBelow = true; break; }
                 if (liveBelow) continue; // something under it is still live; it freezes later (same step if that one froze first)
+                if (FreezeBlocker != null && FreezeBlocker(id, p)) continue; // gameplay hook (touching a player): stays Active
                 Freeze(id);
+            }
+        }
+
+        /// <summary>
+        /// Forced demotion under pressure: slowest balls (smoothed speed below pressureFreezeSpeed), bottom-up, skipping
+        /// any ball with a fast or held live ball under it. Freezes at the exact pose like a normal freeze; a ball frozen
+        /// over a still-settling neighbour is re-queued by that neighbour's next motion event, so nothing ends up floating.
+        /// </summary>
+        private void PressureFreeze()
+        {
+            pressureCands.Clear();
+            float ps = S.pressureFreezeSpeed;
+            for (int i = 0; i < Active.Count; i++)
+            {
+                if (Active.CarriedAt(i)) continue;
+                if (Active.SmoothedSpeedAt(i) < ps) pressureCands.Add(Active.IdAt(i));
+            }
+            if (pressureCands.Count == 0) return;
+            pressureCands.Sort(heightComparer);
+            int budget = S.pressureFreezePerStep;
+            float dy = SupportDy, cd = ContactDist;
+            for (int k = 0; k < pressureCands.Count && budget > 0; k++)
+            {
+                int id = pressureCands[k];
+                if (Store.state[id] != BallStore.State.Active) continue;
+                Vector3 p = Store.pos[id];
+                W.Live.Gather(p, cd, Store.pos, scratchA, id);
+                bool unsafeBelow = false;
+                for (int j = 0; j < scratchA.Count; j++)
+                {
+                    int q = scratchA[j];
+                    if (Store.pos[q].y >= p.y - dy) continue;
+                    if (Store.state[q] == BallStore.State.Held || Active.SmoothedSpeedOf(q) >= ps) { unsafeBelow = true; break; }
+                }
+                if (unsafeBelow) continue;
+                if (FreezeBlocker != null && FreezeBlocker(id, p)) continue; // gameplay hook: a blocked ball uses no budget
+                Freeze(id);
+                budget--; StatPressureFreezes++; TotalPressureFreezes++;
             }
         }
 

@@ -25,7 +25,8 @@ namespace BallPitFinal
                           $"bodiesCreated={a.Active.Created:n0} supportThaws/step={a.StatSupportThaws} freeFall/step={a.StatFreeFall} " +
                           $"impactThaws/step={a.StatImpactThaws} freezes/step={a.StatFreezes} motionEvents/step={a.StatMotionEvents} " +
                           $"supportChecks/step={a.StatSupportChecks} regionsVisited/step={a.StatRegionsVisited} budgetBlocked={a.StatBudgetBlocked} " +
-                          $"adaptiveBlocked={a.StatAdaptiveBlocked} timeBudgetHit={a.StatTimeBudgetHit}");
+                          $"adaptiveBlocked={a.StatAdaptiveBlocked} timeBudgetHit={a.StatTimeBudgetHit} " +
+                          $"pressureFreezes/step={a.StatPressureFreezes} stallSteps={a.StallSteps} totalPressureFreezes={a.TotalPressureFreezes:n0}");
             sb.AppendLine($"CUMULATIVE  thaws={a.TotalThaws:n0} freezes={a.TotalFreezes:n0} excavated={a.TotalExcavated:n0} lost={a.TotalLost} " +
                           $"hangMaxSteps={a.HangMaxSteps} ({a.HangMaxSteps * dt:0.0}s) hangAvg={hangAvgMs:0}ms hangCount={a.HangCount:n0}");
             sb.AppendLine($"PERF  sim={a.LastSimulateMs:0.00}ms simEma={a.SimMsEma:0.00}ms step={a.LastStepMs:0.00}ms drain={a.LastDrainMs:0.00}ms " +
@@ -34,7 +35,9 @@ namespace BallPitFinal
                           $"supportThawsPerStep={s.supportThawsPerStep} maxSupportChecksPerStep={s.maxSupportChecksPerStep} collapseRulesBudgetMs={s.collapseRulesBudgetMs} " +
                           $"regionSizeDiameters={s.regionSizeDiameters} minRegionShare={s.minRegionShare} freeFallDiameters={s.freeFallDiameters} " +
                           $"fallingSpeed={s.fallingSpeed} fallingMarkSeconds={s.fallingMarkSeconds} freezeSpeed={s.freezeSpeed} freezeSeconds={s.freezeSeconds} " +
-                          $"freezeMaxDriftFraction={s.freezeMaxDriftFraction} settleSpeed={s.settleSpeed} settleDrag={s.settleDrag} settleAngularDrag={s.settleAngularDrag} " +
+                          $"freezeMaxDriftFraction={s.freezeMaxDriftFraction} speedSmoothingSeconds={s.speedSmoothingSeconds} " +
+                          $"stallBreakSteps={s.stallBreakSteps} stallMinFreezesPerStep={s.stallMinFreezesPerStep} pressureFreezeSpeed={s.pressureFreezeSpeed} " +
+                          $"pressureFreezePerStep={s.pressureFreezePerStep} settleSpeed={s.settleSpeed} settleDrag={s.settleDrag} settleAngularDrag={s.settleAngularDrag} " +
                           $"sleepThreshold={s.sleepThreshold} linearDrag={s.linearDrag} angularDrag={s.angularDrag} maxSupportGapDegrees={s.maxSupportGapDegrees} " +
                           $"thawMoveFraction={s.thawMoveFraction} solverIterations={s.solverIterations} physicsHz={s.physicsHz}");
             return sb.ToString();

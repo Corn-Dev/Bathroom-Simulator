@@ -52,6 +52,17 @@ namespace BallPitFinal
         public float freezeSeconds = 0.3f;
         [Tooltip("...and drifted less than this fraction of a diameter during that time.")]
         public float freezeMaxDriftFraction = 0.05f;
+        [Tooltip("Time constant (s) of the smoothed displacement velocity used by freeze and settle damping. Filters solver jitter.")]
+        public float speedSmoothingSeconds = 0.1f;
+
+        [Header("Stall breaker (demotion must always make progress)")]
+        [Tooltip("Steps of 'thawing blocked (budget or physics over target) and almost nothing freezing' before pressure freezing starts.")]
+        public int stallBreakSteps = 25;
+        [Tooltip("Fewer freezes per step than this counts toward a stall.")]
+        public int stallMinFreezesPerStep = 3;
+        [Tooltip("Under pressure, freeze balls slower than this (smoothed m/s), bottom-up, never over a fast or held ball.")]
+        public float pressureFreezeSpeed = 0.25f;
+        public int pressureFreezePerStep = 200;
 
         [Header("Collapse scheduling")]
         [Tooltip("Collapse thaws per step (frame-cost smoothing only; the real limit is the active budget).")]
@@ -101,6 +112,21 @@ namespace BallPitFinal
         public int undermineMax = 20000;
         public int dumpPerStep = 6;
         public float dumpHeight = 3f, dumpSpread = 0.6f;
+
+        [Header("Venue placement (all zero/off = today's origin-centered pit, bit for bit)")]
+        [Tooltip("Pit floor center: XZ = lattice center, Y = floor. Set by the venue binding (PitSite.TryApplyTo).")]
+        public Vector3 pitAnchor = Vector3.zero;
+        [Tooltip("Use playBoundsOverride as PlayBounds instead of the box computed from the pit size.")]
+        public bool overridePlayBounds = false;
+        public Bounds playBoundsOverride;
+
+        [Header("Players (session only)")]
+        [Tooltip("Layer of player capsules (session only). Excluded from ball support (EnvMask) and from " +
+                 "RegisterSceneEnvironment. -1 = no players (dev scene, today's behavior).")]
+        public int playerLayer = -1;
+
+        /// <summary>Exact test (not Vector3 ==, which is approximate): any non-zero component.</summary>
+        public bool HasAnchor => pitAnchor.x != 0f || pitAnchor.y != 0f || pitAnchor.z != 0f;
 
         public PitSettings Clone() => (PitSettings)MemberwiseClone();
     }

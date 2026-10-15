@@ -1,74 +1,58 @@
 # Product Vision — Drain the Ball Pit
 
 ## Elevator pitch
-A co-op (up to 4 players) physics sorting game. Players spawn around a HUGE,
-completely full pit of colored balls. The goal is to drain the pit by pulling
-balls out one at a time and sorting them into color-matched containers. Correctly
-"selling" a ball (dropping it in the right container) earns money for the shared
-team pot, which funds upgrades that help clear the pit faster. Wrong color in the
-wrong container → the ball goes back into the pit.
+A co-op (1–4 players) first-person physics sorting game on Steam. Players work
+through a **campaign** of ever-bigger pits of colored balls. In each pit you drain
+it by pulling balls out, sorting them by color, and delivering each color into its
+matching container. A correct delivery "sells" the ball for 1 coin into a shared
+team pot; wrong color goes back to the pit. The pot funds shared upgrades (a tool
+tree: by hand → better hand tools → helpers → full automation). Upgrades and money
+carry forward from pit to pit. Win = drain the final pit.
 
-> Working title: "Drain the Ball Pit" (name not final).
+> Working title: "Drain the Ball Pit" (name not final). The in-engine project folder
+> is still "Bathroom Simulator" (a retired earlier concept); rename is deferred work.
 
-## Core loop
-1. Grab a ball from the pit (one at a time to start).
-2. Carry it to a container.
-3. Drop it in the matching color container to sell it → earn money (shared pot).
-4. Wrong container → ball returns to the pit (penalty: lost time/effort).
-5. Spend the shared pot on upgrades that speed up extraction and sorting.
-6. Repeat until the pit is drained (win condition).
+## Modes
+- **Campaign (primary):** one fixed authored playthrough, ~4–5 pits in sequence,
+  tiny kids' pool (tutorial) → huge. Upgrades + money carry forward. One live
+  session, pits are rooms connected by doors (see game-design.md §1b).
+- **Custom / Freeplay (secondary):** the pick-a-size-and-settings sandbox for people
+  who just want to sort. It's the existing behavior, kept cheaply. Campaign is the
+  focus.
+
+> The FULL living game design is `game-design.md` (campaign structure, tool phases,
+> economy, colors, win, tech constraints). `achievements.md` is the Steam
+> achievement plan. `networking-and-pit.md` is the pit tech + networking + current
+> build status. THIS file is just the high-level pitch; those three are the detail.
 
 ## Pillars
-- **Satisfying bulk progress.** The pit visibly shrinks. Draining should feel good.
-- **Co-op coordination.** Four players dividing labor (extract vs. sort vs. haul)
-  should beat four players doing the same thing.
-- **Meaningful upgrades.** Each purchase changes how you play, not just a number.
-- **Session persistence.** A full playthrough is long; players must be able to
-  save and resume (see tech/persistence steering).
+- **Satisfying bulk progress.** The pit visibly shrinks; draining feels good (ASMR-ish).
+- **Co-op coordination.** Dividing labor (extract vs. sort vs. haul) beats everyone
+  doing the same thing.
+- **Clicker-like progression across the campaign.** Each upgrade changes HOW you play;
+  nothing is overpowered; no purchase ends a pit minutes after buying it.
+- **Session persistence.** A full campaign is long; it must be saveable/resumable.
 
-## Target scope (early)
-- 4 ball colors to start (tunable — colors are cheap to add/remove).
-- 1 shared pit, 4 containers (one per color).
-- Shared money pot.
-- A first tier of upgrades (see design steering).
-- Save/resume of a session's progress.
-
-## Explicitly out of scope for now
-- Enemies/combat.
-- Procedural level generation.
-- Competitive/PvP modes.
+## Explicitly out of scope
+- Enemies/combat, procedural level generation, competitive/PvP.
 - The old Phish fishing content and the Bathroom Simulator concept (both retired).
 
-## Status
-Reusing the retained multiplayer foundation (Unity Netcode for GameObjects +
-Steamworks.NET + Steam lobbies + save system).
+## Foundation
+Reuses the retained multiplayer foundation: Unity Netcode for GameObjects (NGO
+1.7.1) + Steamworks.NET + Steam lobbies + Steam Cloud save. Unity 2022.3.14 LTS,
+URP 14.0.9.
 
-The single biggest technical risk — "can we even render/simulate a huge pit?" —
-is **SOLVED**. The pit tech is built and validated: `Assets/_Prototypes/BallPitFinal/`
-runs **1,000,000 balls at ~125 fps** with real physics feel, exact per-color
-counts, GPU occlusion culling, and seamless physics↔static handoff (no snapping).
-See the networking-and-pit steering for the architecture and gameplay hooks.
+> **Steam app [DECIDED]:** reuse the existing (unreleased, no store page) **Phish**
+> Steam app — rename it in Steamworks, don't register a new AppID (the AppID is just
+> a number; the foundation is wired to it; a new app costs the $100 fee + Steam-key
+> cooldown; safe because Phish was never released). Final project/folder rename off
+> "Bathroom Simulator" is separate deferred work.
 
-We are now moving from pit-tech into the **gameplay layer** (containers, sorting,
-money loop, upgrades) and the two remaining risks: **networking** (host-authoritative
-NGO over Steam) and **bigger tools** (vacuum/drones/sorters that touch many balls).
-Those two are the only things likely to cause lag going forward.
-
-These steering files are the living design record; update them as decisions firm up.
-
-> **Steam app / project rename [DECIDED]:** reuse the existing (unreleased, no
-> public store page) **Phish** Steam app — rename it in Steamworks rather than
-> registering a new AppID. Rationale: the AppID is just a number (store name, art,
-> description are editable), the foundation (Steamworks.NET init, lobbies, Steam
-> Cloud saves) is already wired to it, and a new app costs the $100 Direct fee +
-> the Steam-key request cooldown the user flagged. Safe to reuse precisely because
-> Phish was never released (no reviews/ownership baggage). The in-engine project
-> folder is still named "Bathroom Simulator"; the eventual code/folder rename to
-> the final title is separate deferred work.
-
-> **Who drives implementation:** a stronger Kiro instance on a separate computer
-> (no repo access) leads the hard implementation work and did substantially better
-> on the pit rewrite. This repo's Kiro primarily **applies the changes that Kiro
-> hands over and relays information back**. Other Kiro instances on this computer
-> should assume the same split: prefer integrating/validating the other Kiro's work
-> over re-architecting from scratch.
+## How work happens now (2026-10)
+- Development is done by **various Kiro sessions in this repo**, plus occasionally
+  browser Claude (to save credits). There is NO LONGER an external "strong Kiro" on a
+  separate machine — ignore any older note implying one; this repo's Kiro owns the
+  work directly.
+- The steering docs (this + game-design + achievements + networking-and-pit) are the
+  SHARED MEMORY across sessions. Keep them current; they are how a fresh session
+  learns the project.

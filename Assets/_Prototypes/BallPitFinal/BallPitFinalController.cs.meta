@@ -3,7 +3,8 @@ guid: aec44374105ab1740aa2401917b8585e
 MonoImporter:
   externalObjects: {}
   serializedVersion: 2
-  defaultReferences: []
+  defaultReferences:
+  - ballVisuals: {fileID: 11400000, guid: bc23136c4033b404fbec40cefbe6ab26, type: 2}
   executionOrder: 0
   icon: {instanceID: 0}
   userData: 
