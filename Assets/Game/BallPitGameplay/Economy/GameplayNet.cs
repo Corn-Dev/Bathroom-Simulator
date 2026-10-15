@@ -5,6 +5,7 @@
 // ClientRpcs for the HUD feed and the results panel. Offline (no GameplayNet) gameplay calls the core directly; a
 // static Instance lets callers detect which path is live. Host-spawned by GameplaySession and registered in the kit
 // NetworkPrefabsList (prefab BallPitGameplayNet.prefab).
+using System.Collections.Generic;
 using Unity.Collections;
 using Unity.Netcode;
 using UnityEngine;
@@ -95,21 +96,39 @@ namespace BallPitGameplay
 
         // ------------------------------------------------------------------ Purchases
 
-        /// <summary>Any peer: send a buy intent. The host validates and applies with core.TryBuy.</summary>
-        public void RequestBuy(string upgradeId, string buyerName)
+        /// <summary>Any peer: send a buy intent. The host validates, applies with core.TryBuy, and resolves the buyer's
+        /// name server-side from the sender's client id — the client no longer supplies a (spoofable) name string.</summary>
+        public void RequestBuy(string upgradeId)
         {
-            BuyUpgradeServerRpc(new FixedString64Bytes(Trim(upgradeId, 60)), SlotNames.ToFixed64(buyerName));
+            BuyUpgradeServerRpc(new FixedString64Bytes(Trim(upgradeId, 60)));
         }
 
         [ServerRpc(RequireOwnership = false)]
-        private void BuyUpgradeServerRpc(FixedString64Bytes id, FixedString64Bytes buyerName)
+        private void BuyUpgradeServerRpc(FixedString64Bytes id, ServerRpcParams rpcParams = default)
         {
             if (core == null) return;
             string upgradeId = id.ToString();
-            if (core.TryBuy(upgradeId, buyerName.ToString(), out _))
+            // Trust the transport-authenticated sender id, not a client-sent name: resolve the buyer's display name on
+            // the host from the sender's PlayerSlot (same name source the session layer uses).
+            string buyerName = ResolveBuyerName(rpcParams.Receive.SenderClientId);
+            if (core.TryBuy(upgradeId, buyerName, out _))
             {
                 // HostPushPurchase already updated the levels list + money + broadcast the feed line.
             }
+        }
+
+        // Host only: map a client id to its display name via the sender's spawned PlayerAvatar/PlayerSlot (OwnerClientId
+        // is NGO's authenticated owner). Empty when the sender has no avatar yet; HostPushPurchase then shows "Someone".
+        private static string ResolveBuyerName(ulong senderClientId)
+        {
+            IReadOnlyList<PlayerAvatar> avatars = PlayerAvatar.All;
+            for (int i = 0; i < avatars.Count; i++)
+            {
+                PlayerAvatar a = avatars[i];
+                if (a != null && a.OwnerClientId == senderClientId)
+                    return a.Slot != null ? a.Slot.DisplayName : null;
+            }
+            return null;
         }
 
         // ------------------------------------------------------------------ Host → clients mirroring + feed

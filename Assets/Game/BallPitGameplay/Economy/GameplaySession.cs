@@ -205,9 +205,10 @@ namespace BallPitGameplay
         /// <summary>Routes a buy intent: networked → GameplayNet ServerRpc; offline/dev → the core directly.</summary>
         public void RequestBuy(string upgradeId)
         {
-            string buyer = LocalPlayerName();
-            if (net != null) net.RequestBuy(upgradeId, buyer);
-            else if (core != null && core.TryBuy(upgradeId, buyer, out _)) { /* OnUpgradePurchasedHost applies + feeds */ }
+            // Networked: the host resolves the buyer name from the sender id (no client-sent name). Offline: there is no
+            // transport, so the local core is called directly with the local player's name for the feed line.
+            if (net != null) net.RequestBuy(upgradeId);
+            else if (core != null && core.TryBuy(upgradeId, LocalPlayerName(), out _)) { /* OnUpgradePurchasedHost applies + feeds */ }
         }
 
         // ------------------------------------------------------------------ Host callbacks

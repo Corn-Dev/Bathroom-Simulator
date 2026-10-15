@@ -5,19 +5,31 @@ Implements the sort / sell / money / upgrade / win loop, hands-only, in the sing
 Assembly-CSharp (no asmdef), namespace `BallPitGameplay` (gameplay) or `BallPitFinal`
 (the two additive pit edits). See `DECISIONS-B.md` for the why.
 
-> **VERIFICATION NOTE (read first).** No Unity editor is installed on this machine
-> (`C:\Program Files\Unity\Hub\Editor` is absent; `ProjectVersion.txt` = 2022.3.14f1), so a
-> headless/batchmode compile could NOT be run here. Verification was done by careful
-> cross-file signature tracing against the real worktree sources and the installed packages
-> (`com.unity.netcode.gameobjects@1.7.1`, `textmeshpro@3.0.6`, `ugui@1.0.0`). **An in-editor
-> compile is still required of you.** Specifically check:
+> **VERIFICATION NOTE (read first).** By design there is **no Unity compiler on the agent
+> machine** (`C:\Program Files\Unity\Hub\Editor` is absent; `ProjectVersion.txt` = 2022.3.14f1).
+> A headless/batchmode compile is therefore **not possible here and is explicitly not a blocker**
+> — the OWNER compiles in their editor. Agent verification was done by careful cross-file
+> signature tracing against the real worktree sources and the installed packages
+> (`com.unity.netcode.gameobjects@1.7.1`, `textmeshpro@3.0.6`, `ugui@1.0.0`) in
+> `Library/PackageCache`.
+>
+> **OWNER COMPILE-CHECK (first open in Unity 2022.3.14f1).** Reading alone cannot fully verify
+> the NGO IL-postprocess codegen; confirm these compile and generate without errors on first
+> import, THEN run the §7 "Manual test checklist" below:
 > - the project compiles with no CS errors after the new files import (watch the Economy /
 >   Containers / UI / Tools / Colors folders);
-> - NGO codegen accepts `GameplayNet` (its `[ServerRpc(RequireOwnership=false)]`,
->   `[ClientRpc]`, `NetworkVariable<long/bool>`, `NetworkList<int>`, `FixedString64/128Bytes`);
-> - `PlayerToolState`'s owner-write NetworkVariables codegen.
-> The `NetworkList<int>(null, Everyone, Server)` ctor and the RPC/NetworkVariable surface were
-> confirmed against the 1.7.1 package source in `Library/PackageCache`.
+> - **`NetworkList<int>` on `GameplayNet`** — the `new NetworkList<int>(null, Everyone, Server)`
+>   ctor and the list's `Clear/Add/[]/Count` usage codegen cleanly;
+> - **NGO codegen on `GameplayNet`** — `[ServerRpc(RequireOwnership=false)]
+>   BuyUpgradeServerRpc(FixedString64Bytes, ServerRpcParams=default)` (now resolves the buyer
+>   name host-side from `ServerRpcParams.Receive.SenderClientId` — no client-sent name string),
+>   `[ClientRpc] FeedClientRpc`/`WinClientRpc`, `NetworkVariable<long>/<bool>`,
+>   `FixedString64/128Bytes`;
+> - **NGO codegen on `PlayerToolState`** — its owner-write NetworkVariables
+>   (`NetworkVariableWritePermission.Owner`).
+> These four items are the only parts a static trace cannot fully prove; everything else was
+> signature-traced. The ctor/RPC/NetworkVariable surface was matched against the 1.7.1 package
+> source, but IL codegen only runs in the editor.
 
 ---
 
@@ -37,8 +49,10 @@ Assembly-CSharp (no asmdef), namespace `BallPitGameplay` (gameplay) or `BallPitF
 - `UpgradeCatalog.cs` — SO: ordered upgrades, `IndexOf`/`Find`, `Validate`.
 - `GameplayCore.cs` + `GameplayCore.Upgrades.cs` — plain-C# authority: money, team levels,
   `CanBuy`/`TryBuy`/`AddSale`, integrity counters, `EffectiveStat`/`NamedHookAmount`.
-- `GameplayNet.cs` — NGO adapter: replicates money/levels/win; `BuyUpgradeServerRpc`;
-  `FeedClientRpc`/`WinClientRpc`; `static Instance`. Also `ResultsData`.
+- `GameplayNet.cs` — NGO adapter: replicates money/levels/win; `BuyUpgradeServerRpc` (resolves
+  the buyer name on the host from `ServerRpcParams.Receive.SenderClientId` via the sender's
+  `PlayerAvatar`/`PlayerSlot` — the client never sends a name); `FeedClientRpc`/`WinClientRpc`;
+  `static Instance`. Also `ResultsData`.
 - `IGameplayReadModel.cs` + `GameplayReadModel.cs` — read-only facade for UI + containers.
 - `EconomySaveParticipant.cs` — `IBallPitSaveParticipant` (tag `economy`), integrity flags.
 - `GameplaySession.cs` — the scene glue: builds the core per world, host-spawns `GameplayNet`,
@@ -153,9 +167,14 @@ Open the project in Unity (it generates `.meta` for the new files/folders), then
 
 - **NGO 1.7.1:** `NetworkList<int>(IEnumerable, readPerm, writePerm)` ctor confirmed in the
   package source. `NetworkVariable<long>/<bool>` with `Everyone`/`Server` perms (same pattern
-  as `PlayerCapabilities`). `[ServerRpc(RequireOwnership=false)]`, `[ClientRpc]`,
+  as `PlayerCapabilities`). `[ServerRpc(RequireOwnership=false)]` with a trailing
+  `ServerRpcParams=default` and `rpcParams.Receive.SenderClientId`, `[ClientRpc]`,
   `FixedString64Bytes`/`FixedString128Bytes`, `NetworkObject.Spawn(bool)/Despawn(bool)`,
   `NetworkVariableWritePermission.Owner` (PlayerToolState).
+- **Purchase authority:** the buyer name is resolved host-side from the authenticated sender id
+  (`ServerRpcParams.Receive.SenderClientId` → the matching `PlayerAvatar.OwnerClientId` →
+  `PlayerSlot.DisplayName`); a client cannot spoof another player's name. `core.TryBuy`
+  validation is unchanged and identical for host and clients.
 - **Hopper invariant:** `PocketHeld`/`PromoteFromHopper` only use the player's own hopper
   (0–3); `ReturnToPit` completes Hopper→Active within one call. No ball lingers in
   `State.Hopper` across a step except a player hopper (networking-and-pit §10).
