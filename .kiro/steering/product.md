@@ -56,3 +56,16 @@ URP 14.0.9.
 - The steering docs (this + game-design + achievements + networking-and-pit) are the
   SHARED MEMORY across sessions. Keep them current; they are how a fresh session
   learns the project.
+- **No Unity compiler or runtime on the agent machine [IMPORTANT].** Kiro sessions
+  (and any workflow agents they spawn) CANNOT run a Unity batchmode compile, enter
+  play mode, or run the game here — no Unity editor is installed on the dev box the
+  agent runs on. An agent's "verification" is careful cross-file signature tracing
+  against the real sources in the repo + the packages in `Library/PackageCache`. The
+  final compile and the actual play/multiplayer test are ALWAYS done by the OWNER in
+  their Unity editor. So: agents must write code that is traced to compile, and must
+  hand back (in a HANDOFF doc) the exact in-editor steps + a manual test checklist for
+  the owner — never claim a Unity compile or a runtime behavior was verified by the
+  agent. This replaces the retired external-Kiro assumption that "another Kiro
+  integrates and compile-fixes"; there is no such integrator now, only the owner's
+  editor. If a brief or review implies the agent itself compiles/runs Unity, that
+  wording is stale — fix it.
