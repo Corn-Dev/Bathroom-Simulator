@@ -65,7 +65,10 @@ namespace BallPitGameplay
     }
 
     /// <summary>The arms (design 8.3 step 8): LMB grabs the target ball when nothing is held, LMB drops with the player's
-    /// velocity, RMB throws along the view. Host: PitAuthority; client: NetPit intents. Releases go through ThrowHeld.</summary>
+    /// velocity, RMB throws along the view. Host: PitAuthority; client: NetPit intents. Releases go through ThrowHeld.
+    /// Deliverable B (additive): carry capacity &gt; 1 pockets the held ball on grab (host) and promotes the next on
+    /// release; Strong Arm scales throw power (already via ThrowVelocity); smart release prefers the aimed container's
+    /// colour; the carried count is replicated through PlayerToolState so remotes see the stack.</summary>
     public sealed class ArmsTool : IPlayerTool
     {
         private PlayerInteractor owner;
@@ -79,23 +82,95 @@ namespace BallPitGameplay
         {
             BallPitFinalController c = who != null ? who.Controller : null;
             if (c == null) return;
+            PlayerCapabilities caps = who.Capabilities;
             if (c.LocalHeldBall < 0)
             {
                 if (primary && target.Kind == InteractionTargetKind.Ball && target.BallId >= 0) Grab(c, target.BallId);
+                SyncCarried(who);
+                return;
+            }
+            // Holding: a primary press on a NEW ball pockets the current and grabs it (carry capacity > 1, host rule).
+            if (primary && target.Kind == InteractionTargetKind.Ball && target.BallId >= 0 && CanCarryMore(who, caps))
+            {
+                GrabWithPocket(who, c, target.BallId);
+                SyncCarried(who);
                 return;
             }
             PlayerMotor motor = who.Motor;
             Vector3 body = motor != null ? motor.Velocity : Vector3.zero;
-            if (primary) Release(c, body);
+            if (primary) { ReleaseSmart(who, c, in target, body); SyncCarried(who); }
             else if (secondary)
             {
                 PlayerConfig cfg = who.Config;
-                PlayerCapabilities caps = who.Capabilities;
                 if (cfg == null) return;
                 Vector3 inherit = cfg.throwInheritsVelocity ? body : Vector3.zero;
-                Release(c, ThrowVelocity(who.View.AimRay.direction, cfg.throwSpeed, cfg.throwUpBias,
+                ReleaseSmart(who, c, in target, ThrowVelocity(who.View.AimRay.direction, cfg.throwSpeed, cfg.throwUpBias,
                                          caps != null ? caps.ThrowPower : 1f, inherit));
+                SyncCarried(who);
             }
+        }
+
+        // True when the player may pocket the held ball and grab another (host rule; the local view can predict it).
+        private static bool CanCarryMore(PlayerInteractor who, PlayerCapabilities caps)
+        {
+            BallPitFinalController c = who.Controller;
+            PitAuthority a = c != null ? c.Authority : null;
+            int slot = c != null ? c.LocalSlot : -1;
+            int capacity = caps != null ? caps.CarryCapacity : 1;
+            if (a == null || (uint)slot >= PitAuthority.MaxPlayers) return false; // only the host pockets
+            int carried = (a.HeldId[slot] >= 0 ? 1 : 0) + a.HopperCount(slot);
+            return carried < capacity;
+        }
+
+        // Host: pocket the held ball into the player's own hopper, then grab the new one.
+        private static void GrabWithPocket(PlayerInteractor who, BallPitFinalController c, int id)
+        {
+            PitAuthority a = c.Authority;
+            int slot = c.LocalSlot;
+            if (a == null || (uint)slot >= PitAuthority.MaxPlayers) return;
+            if (a.PocketHeld(slot)) a.TryGrab(slot, id);
+        }
+
+        // Smart release: when aiming at a container whose colour the held ball does NOT match but a pocketed ball does,
+        // swap so the matching ball is thrown first (host). Then release along the given velocity; promote the next.
+        private void ReleaseSmart(PlayerInteractor who, BallPitFinalController c, in InteractionTarget target, Vector3 velocity)
+        {
+            PitAuthority a = c.Authority;
+            int slot = c.LocalSlot;
+            if (a != null && (uint)slot < PitAuthority.MaxPlayers && target.Kind == InteractionTargetKind.Container &&
+                target.Interactable is BallContainer container)
+            {
+                int held = a.HeldId[slot];
+                PitWorld w = c.World;
+                if (held >= 0 && w != null && w.Store.color[held] != container.ColorIndex && a.HopperCount(slot) > 0)
+                {
+                    // One swap handles the common 2-deep case: pocket the current, promote the next.
+                    Vector3 hand = who.View != null ? who.View.GetHoldPoint(HoldPointTime.Simulation) : w.PitCenter;
+                    if (a.PocketHeld(slot)) a.PromoteFromHopper(slot, hand);
+                }
+            }
+            Release(c, velocity);
+            // After the throw, bring the next pocketed ball to hand so the stack stays "in hand".
+            if (a != null && (uint)slot < PitAuthority.MaxPlayers && a.HeldId[slot] < 0 && a.HopperCount(slot) > 0)
+            {
+                Vector3 hand = who.View != null ? who.View.GetHoldPoint(HoldPointTime.Simulation) : (c.World != null ? c.World.PitCenter : Vector3.zero);
+                a.PromoteFromHopper(slot, hand);
+            }
+        }
+
+        // Writes the local carried count to the replicated PlayerToolState (owner only; remotes read it).
+        private static void SyncCarried(PlayerInteractor who)
+        {
+            PlayerAvatar avatar = who != null ? who.Avatar : null;
+            PlayerToolState state = avatar != null ? avatar.GetComponent<PlayerToolState>() : null;
+            if (state == null) return;
+            BallPitFinalController c = who.Controller;
+            PitAuthority a = c != null ? c.Authority : null;
+            int slot = c != null ? c.LocalSlot : -1;
+            int carried;
+            if (a != null && (uint)slot < PitAuthority.MaxPlayers) carried = (a.HeldId[slot] >= 0 ? 1 : 0) + a.HopperCount(slot);
+            else carried = c != null && c.LocalHeldBall >= 0 ? 1 : 0;
+            state.SetCarried(carried);
         }
 
         public void OnBeforeTeleport()

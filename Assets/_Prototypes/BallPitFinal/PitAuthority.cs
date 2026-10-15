@@ -61,6 +61,14 @@ namespace BallPitFinal
         /// return 0. Null (default) = unchanged behavior.</summary>
         public System.Func<int, bool> ToolFilter;
 
+        /// <summary>
+        /// Optional gameplay hook, host only (deliverable B). Default null = today's behavior, bit for bit. Consulted at
+        /// the TOP of Lose(id): returning true means "the game handled this ball" (it routed it back into the pit), so
+        /// Lose does NOT mark it Lost. The economy sets it to send strays through ReturnToPit instead of blocking the
+        /// win with Lost balls (game-design §10). Must be cheap and must not throw.
+        /// </summary>
+        public System.Func<int, bool> LossHook;
+
         public int StepIndex { get; private set; }
         public readonly int[] HeldId = { -1, -1, -1, -1 };
         public readonly Vector3[] HandTarget = new Vector3[MaxPlayers];
@@ -373,6 +381,7 @@ namespace BallPitFinal
 
         private void Lose(int id)
         {
+            if (LossHook != null && LossHook(id)) return; // deliverable B: the game returned it to the pit; do not mark Lost
             if (Active.IsActive(id)) Active.Demote(id);
             for (int p = 0; p < MaxPlayers; p++) if (HeldId[p] == id) HeldId[p] = -1;
             W.ToGone(id, BallStore.State.Lost);

@@ -21,6 +21,7 @@ namespace BallPitSession
         public const string ColorCount = "colorCount";
         public const string Fill = "fillType";
         public const string WorldSeed = CommonSettings.Keys.WorldSeed; // "worldSeed": Core reads it by key
+        public const string Palette = "palette"; // deliverable B: visual only, NOT world-shaping, editable after start
 
         public const string FillFcc = "fcc";
         public const string FillRandom = "random";
@@ -49,6 +50,19 @@ namespace BallPitSession
                     group: CommonSettings.GroupWorld),
                 SettingDefinition.Int(WorldSeed, "World seed", def: new PitSettings().seed, min: 1, max: int.MaxValue,
                     group: CommonSettings.GroupWorld),
+                // Deliverable B: visual-only palette, NOT in WorldShapingKeys, so it is editable mid-game. The keys
+                // match the shipped PalettePreset assets (Ball Pit/Create Default Gameplay Assets). PaletteApplier
+                // resolves the active key against the assigned PaletteService.
+                SettingDefinition.Choice(Palette, "Palette", "classic",
+                    new[]
+                    {
+                        new SettingChoice("classic", "Classic"),
+                        new SettingChoice("pastel", "Pastel"),
+                        new SettingChoice("candy", "Candy"),
+                        new SettingChoice("neon", "Neon"),
+                        new SettingChoice("ocean", "Ocean"),
+                        new SettingChoice("sunset", "Sunset"),
+                    }, editableAfterStart: true),
                 CommonSettings.AutosaveMinutes,
             };
         }

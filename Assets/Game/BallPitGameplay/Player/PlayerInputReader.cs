@@ -10,8 +10,9 @@ using UnityEngine;
 
 namespace BallPitGameplay
 {
-    /// <summary>Interact (E) and Shop (Tab) are counted but reserved for deliverable B.</summary>
-    public enum PlayerButton { Jump, Sprint, Primary, Secondary, Respawn, Interact, Shop }
+    /// <summary>Interact (E) and Shop (Tab) are counted but reserved for deliverable B. Hotbar1..5 (deliverable B,
+    /// additive — appended so existing indices are unchanged) select tools; ToolWheel scrolls through them.</summary>
+    public enum PlayerButton { Jump, Sprint, Primary, Secondary, Respawn, Interact, Shop, Hotbar1, Hotbar2, Hotbar3, Hotbar4, Hotbar5 }
 
     [System.Flags]
     public enum PlayerInputBlock { None = 0, Inactive = 1, Unfocused = 2, KitModal = 4, CursorClaimed = 8 }
@@ -24,6 +25,7 @@ namespace BallPitGameplay
         Vector2 LookDelta { get; }           // degrees this frame (x = yaw right, y = pitch up); sensitivity and invert applied
         bool IsHeld(PlayerButton button);
         int PressCount(PlayerButton button); // only grows; each consumer keeps its own last-seen value
+        float ToolWheel { get; }             // deliverable B: mouse-wheel delta this frame (0 while blocked)
     }
 
     /// <summary>Device layer: LegacyInputSource now; an Input System or gamepad source later, with no gameplay change.</summary>
@@ -33,6 +35,7 @@ namespace BallPitGameplay
         Vector2 ReadLookDegrees(float unscaledDt); // before user sensitivity. Mouse: units x degreesPerUnit. Stick: deg/s x dt
         bool ReadHeld(PlayerButton button);
         bool ReadPressed(PlayerButton button);     // went down this frame
+        float ReadWheel();                         // deliverable B: scroll-wheel delta this frame (+ up / - down)
     }
 
     [System.Serializable]
@@ -42,6 +45,7 @@ namespace BallPitGameplay
         [Tooltip("Degrees per Mouse X/Y unit. Those axes are per-frame deltas: never multiplied by deltaTime.")]
         public float degreesPerMouseUnit = 2f;
         public KeyCode jump = KeyCode.Space, sprint = KeyCode.LeftShift, respawn = KeyCode.R, interact = KeyCode.E, shop = KeyCode.Tab;
+        public KeyCode hotbar1 = KeyCode.Alpha1, hotbar2 = KeyCode.Alpha2, hotbar3 = KeyCode.Alpha3, hotbar4 = KeyCode.Alpha4, hotbar5 = KeyCode.Alpha5;
         public int primaryMouseButton = 0, secondaryMouseButton = 1;
 
         [System.NonSerialized] private bool moveAxes = true, lookAxes = true;
@@ -96,9 +100,16 @@ namespace BallPitGameplay
                 case PlayerButton.Respawn: return respawn;
                 case PlayerButton.Interact: return interact;
                 case PlayerButton.Shop: return shop;
+                case PlayerButton.Hotbar1: return hotbar1;
+                case PlayerButton.Hotbar2: return hotbar2;
+                case PlayerButton.Hotbar3: return hotbar3;
+                case PlayerButton.Hotbar4: return hotbar4;
+                case PlayerButton.Hotbar5: return hotbar5;
                 default: return KeyCode.None;
             }
         }
+
+        public float ReadWheel() => Input.mouseScrollDelta.y;
 
         private static bool AxisExists(string axis, Object context)
         {
@@ -213,7 +224,7 @@ namespace BallPitGameplay
     [DisallowMultipleComponent]
     public sealed class PlayerInputReader : MonoBehaviour, IPlayerInput
     {
-        private const int ButtonCount = 7; // PlayerButton values
+        private const int ButtonCount = 12; // PlayerButton values (deliverable B appended Hotbar1..5)
 
         [SerializeField] private LegacyInputSource legacy = new LegacyInputSource();
         [Tooltip("Optional: a component implementing IPlayerInputSource (Input System, gamepad). Empty = the legacy source.")]
@@ -227,6 +238,7 @@ namespace BallPitGameplay
         private int menuClosedFrame = -1;
         private PlayerInputBlock block = PlayerInputBlock.Inactive;
         private Vector2 move, look;
+        private float wheel;
         private readonly bool[] held = new bool[ButtonCount];
         private readonly int[] presses = new int[ButtonCount];
 
@@ -235,6 +247,7 @@ namespace BallPitGameplay
         public Vector2 LookDelta => Active ? look : Vector2.zero;
         public bool IsHeld(PlayerButton button) => Active && held[(int)button];
         public int PressCount(PlayerButton button) => presses[(int)button];
+        public float ToolWheel => Active ? wheel : 0f;
         /// <summary>Why input is blocked this frame (None while active).</summary>
         public PlayerInputBlock BlockReasons => block;
 
@@ -328,6 +341,8 @@ namespace BallPitGameplay
                 if (wasBlocked) { l = Vector2.zero; wasBlocked = false; } // absorbs the jump when the cursor re-locks
                 move = m;
                 look = l;
+                float w = source.ReadWheel();
+                wheel = float.IsNaN(w) || float.IsInfinity(w) ? 0f : w;
                 for (int i = 0; i < ButtonCount; i++)
                 {
                     held[i] = source.ReadHeld((PlayerButton)i);
@@ -365,6 +380,7 @@ namespace BallPitGameplay
         private void ClearSample()
         {
             move = look = Vector2.zero;
+            wheel = 0f;
             for (int i = 0; i < ButtonCount; i++) held[i] = false;
         }
 

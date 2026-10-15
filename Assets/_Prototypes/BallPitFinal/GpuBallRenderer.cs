@@ -268,6 +268,20 @@ namespace BallPitFinal
             Graphics.DrawMeshInstancedProcedural(nearMesh, 0, ballMat, drawBounds, count, mpbDyn, CastShadows, ReceiveShadows, Layer, cam);
         }
 
+        /// <summary>
+        /// Deliverable B (additive, boundary-respecting): re-fill the 16-slot _Palette vector array on ballMat using the
+        /// SAME packing as the constructor, so a new palette (preset change, or a client's colour-blind override) applies
+        /// live without rebuilding the renderer. The ONLY GpuBallRenderer change deliverable B makes; shaders, buffers and
+        /// the cull path are untouched. A null or empty palette is ignored.
+        /// </summary>
+        public void SetPalette(Color[] palette)
+        {
+            if (palette == null || palette.Length == 0 || ballMat == null) return;
+            var pal = new Vector4[16];
+            for (int i = 0; i < 16; i++) { Color c = palette[i % palette.Length]; pal[i] = new Vector4(c.r, c.g, c.b, 1f); }
+            ballMat.SetVectorArray(IdPalette, pal);
+        }
+
         private void SetupOccluder(MaterialPropertyBlock mpb, ComputeBuffer visible, Matrix4x4 gpuViewProj, Matrix4x4 view)
         {
             mpb.SetBuffer(IdInstances, instances);
