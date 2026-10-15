@@ -37,19 +37,30 @@ drops in later.
 
 ---
 
-## 1. Working rules (in-repo, real compiler)
+## 1. Working rules (in-repo; NO Unity compiler on the agent machine)
 
-- **This repo, real Unity.** Unity 2022.3.14 LTS, URP 14.0.9, NGO 1.7.1, Steamworks.NET.
-  A real compiler is available — COMPILE and fix errors here. Ignore any old-brief rule
-  about "no compiler", "another Kiro integrates", stub-compiles, or `c:\Users\cscheel`
-  paths; those were for a retired external machine.
+- **This repo, real project — but NO Unity on the agent box.** The target is Unity
+  2022.3.14 LTS, URP 14.0.9, NGO 1.7.1, Steamworks.NET. There is NO Unity editor or
+  C# compiler installed on the machine the agent runs on, so the agent CANNOT run a
+  batchmode compile or enter play mode. (The old brief's "no compiler / another Kiro
+  integrates / `c:\Users\cscheel` paths / stub-compile" rules are retired for a
+  different reason — there is no external integrator — but the "no compiler here" fact
+  still holds: the OWNER compiles, in their editor.)
 - **Absolute workspace paths.** Project root:
   `c:\Users\cohen\Desktop\Game Dev\Active_Projects\Bathroom Simulator`.
 - **Write to disk early and incrementally.** Keep source files under ~400 lines; split
   with partial classes where needed. Authoring components get gizmos + validation;
   editor-only code lives in `Editor/` folders.
-- **Verify by compiling + tracing.** Before signalling done, the project must compile and
-  the manual loop (below §6) must be traced end to end. Clean up any temp files.
+- **Verify by TRACING, not compiling. A clean Unity compile is NOT a gate for this
+  work and MUST NOT block the review.** The agent verifies by careful cross-file
+  signature tracing against the real worktree sources + the packages in
+  `Library/PackageCache` (confirm every referenced type/member exists and NGO 1.7.1
+  usage is plausible), and by tracing the §6 runtime loop end to end on paper. The
+  agent must write code that is traced to compile, call out any construct it could not
+  fully verify by reading (e.g. NGO codegen like `NetworkList<T>`) as an
+  owner-compile-check item in the HANDOFF, and NEVER claim a Unity compile or a runtime
+  behavior was actually run. The real compile + the manual host+client play test (§7
+  checklist) are the OWNER's, in their editor. Clean up any temp files.
 
 ---
 
@@ -263,3 +274,9 @@ real signatures. Confirm every referenced member exists before relying on it.
   campaign/holder seams are not designed against.
 - Every referenced type/member exists with a matching signature; NGO 1.7.1 usage is
   plausible. Any HIGH finding goes back to the coder.
+- **A missing Unity compile is NOT a finding.** There is no Unity compiler on the agent
+  machine (§1); the owner compiles in their editor. Do NOT raise "the project was never
+  compiled" as a HIGH/blocker. Instead, confirm the HANDOFF lists the unverifiable-by-
+  reading constructs (e.g. NGO codegen such as `NetworkList<T>`) as owner-compile-check
+  items. Grade only what reading can establish: signatures exist, boundaries hold, paths
+  trace, invariants preserved, validation identical.
