@@ -121,9 +121,31 @@ namespace BallPitGameplay
                 if (isHost) SpawnGameplayNet();
                 else BindClientNet();
             }
+
+            // Seed container fills immediately (restored saves + late joiners show the right level without waiting a frame).
+            if (readModel != null && readModel.IsLive) UpdateContainerFills();
         }
 
         private void OnPitWorldDisposed(PitWorld world) => TearDown();
+
+        // Push each container's fill fraction every frame on EVERY peer (brief §4.1). The fill is a pure read of the
+        // replicated ledger (readModel.SoldFraction), so host and clients agree with no extra traffic; BallContainer.SetFill
+        // early-outs when the fraction has not meaningfully changed, so this is cheap. Containers with no fill view are no-ops.
+        private void Update()
+        {
+            if (!built || readModel == null || !readModel.IsLive) return;
+            UpdateContainerFills();
+        }
+
+        private void UpdateContainerFills()
+        {
+            IReadOnlyList<BallContainer> containers = ContainerRegistry.All;
+            for (int i = 0; i < containers.Count; i++)
+            {
+                BallContainer c = containers[i];
+                if (c != null) c.SetFill(readModel.SoldFraction(c.ColorIndex));
+            }
+        }
 
         private void TearDown()
         {
