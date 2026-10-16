@@ -100,3 +100,7 @@ InitTestScene*.unity*
 
 # Git worktrees (throwaway working copies for workflows)
 /.worktrees/
+
+# Large editable art masters — keep on disk / cloud backup, not in git
+# (game-ready exports like .png are committed; the editable source is not)
+*.xcf
