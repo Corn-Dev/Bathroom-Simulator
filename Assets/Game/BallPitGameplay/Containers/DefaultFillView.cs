@@ -15,11 +15,17 @@ namespace BallPitGameplay
         [Tooltip("Local Y position at empty and full (centre of the fill volume).")]
         [SerializeField] private float emptyPosY = 0f, fullPosY = 0.5f;
 
-        private void Reset() => pivot = transform;
+        // Default to NO pivot: SetFill is a safe no-op until the owner assigns a dedicated child to scale. Driving the
+        // fill against the container root would move/flatten the whole container (and its intake box + art children),
+        // so this view refuses to deform the root.
+        private void Reset() => pivot = null;
 
         public void SetFill(float fraction)
         {
-            Transform t = pivot != null ? pivot : transform;
+            Transform t = pivot;
+            // No pivot, or the pivot IS this container's root/the view's own object: do nothing. A fill bar needs its own
+            // child transform; scaling the root would deform the entire container (the bug this guards against).
+            if (t == null || t == transform) return;
             float f = Mathf.Clamp01(float.IsNaN(fraction) ? 0f : fraction);
             Vector3 s = t.localScale;
             s.y = Mathf.Lerp(emptyScaleY, fullScaleY, f);
