@@ -127,6 +127,26 @@ the renderer). Not blocking; lowest-risk piece.
 - **Containers:** one per color, owner-placed; accept balls only through the top
   opening; fill = % of that color sold (no capacity). Wrong color → back to the pit
   (drops from above at a random spot). Out-of-bounds returns strays the same way.
+- **Visible fill is a core satisfaction, not optional polish [DECIDED 2026-10].** The
+  player MUST see the balls leave the pit and accumulate in the container — a sold ball
+  silently vanishing feels awful and undercuts the whole sorting payoff (a core pillar).
+  Each container shows a **0–100% mass of its color** rising as that color sells. The
+  container ART is per-area/themed (gumball machine, bin, clear tube, hopper…), but
+  under every theme it's the same thing: "this color, this fraction full," driven by the
+  replicated ledger. The accumulated mass is CHEAP (instanced/faked colored balls or a
+  shaped fill, NOT thousands of real rigidbodies — a container may hold 100k+ sold
+  balls). This is the container analogue of the pit's own data-not-objects trick.
+- **"Movie magic" between endpoints [DECIDED 2026-10].** Balls are REAL (physics) only
+  where the player's attention is — entering a tool/intake and arriving/settling in the
+  container. In between (traveling a vacuum tube, a conveyor, a chute) the visual may be
+  pure fakery (instanced movers, a stream, or nothing). This extends the pit's "real
+  where it matters, data where it doesn't" rule to delivery, and bounds the real-ball
+  cost of every future tool.
+- **The deposit should FEEL satisfying [DECIDED intent; mechanic TBD by playtest].** Not
+  fiddly. Whether a thrown ball physically lands-and-settles THEN sells, vs sells on
+  contact and spawns into the fill, is a FEEL call to be made by trying it in the kiddie-
+  pool slice — not decided on paper. Default to building the physical land-and-settle
+  version first (more satisfying) with a bit of sale juice (plonk/pop, counter tick).
 - Pushing tools (broom, blower) only move balls on the floor; never feed a container.
 - Helpers (drones, bots) make piles; only upgrades let them deliver (first "own color
   only", then delivery into that color's container).
