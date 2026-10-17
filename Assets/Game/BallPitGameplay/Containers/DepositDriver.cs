@@ -22,6 +22,7 @@ namespace BallPitGameplay
         private readonly DropPointPicker dropPicker;
         private readonly System.Func<PitSite> activeSite;
         private readonly System.Action onWin;
+        private readonly SettlingDeposits settling;
 
         private struct Pending { public int Id; public int Color; public Vector3 Pos; public BallContainer Container; public bool Sell; }
         private readonly List<Pending> pending = new List<Pending>(64);
@@ -39,6 +40,9 @@ namespace BallPitGameplay
             this.activeSite = activeSite;
             this.onWin = onWin;
             if (world != null) dropPicker = new DropPointPicker(world);
+            // Sell-on-cross / settle-after (brief §3.1): the demote is deferred to this helper so a sold ball keeps
+            // falling and visibly settles before it joins the container fill. Host only (authority non-null).
+            if (authority != null) settling = new SettlingDeposits(authority, SettlingDeposits.DefaultDwellSeconds);
             if (authority != null) authority.LossHook = HandleLoss; // strays return instead of becoming Lost
         }
 
@@ -46,6 +50,9 @@ namespace BallPitGameplay
         public void Detach()
         {
             if (authority != null && authority.LossHook == HandleLoss) authority.LossHook = null;
+            // Demote any ball still dwelling so no sold ball is stranded Live after teardown. Guard: a disposed world
+            // must not throw out of teardown. Do NOT re-run CheckWin here (teardown owns the lifetime, not the win).
+            try { settling?.Flush(); } catch (System.Exception e) { Debug.LogException(e); }
         }
 
         public void BeforePhysicsStep(float dt) { }
@@ -66,6 +73,7 @@ namespace BallPitGameplay
             {
                 if (active.CarriedAt(i)) continue; // a held ball is not deposited
                 int id = active.IdAt(i);
+                if (settling != null && settling.Owns(id)) continue; // already sold, dwelling before its demote
                 Vector3 pos = active.PosAt(i);
                 int ballColor = world.Store.color[id];
                 bool claimed = false;
@@ -90,16 +98,22 @@ namespace BallPitGameplay
                 if (d.Sell) Sell(d.Id, d.Color, d.Pos, d.Container);
                 else Reject(d.Id, d.Pos, d.Container);
             }
+
+            // Settle-after: demote any dwelling ball whose moment is up. Runs BEFORE CheckWin so the win latches on the
+            // step the final dwell completes (never before: a dwelling ball is still Live, so StateTotal(Stored) < Count).
+            settling?.Tick(Time.fixedTime);
             CheckWin();
         }
 
         private void Sell(int id, int color, Vector3 pos, BallContainer container)
         {
-            authority.Deposit(id);
+            // Credit on cross (unchanged timing + on-cross pos). The demote is DEFERRED to settling so the real ball
+            // keeps falling and visibly settles before joining the fill (brief §3.1 "sell on cross, settle after").
             string seller = null; bool thrown = false; float dist = 0f;
             attribution?.Consume(id, pos, out seller, out thrown, out dist);
             core.AddSale(color, seller, thrown, dist);
             container.NotifySold(pos);
+            settling?.Register(id, Time.fixedTime);
         }
 
         private void Reject(int id, Vector3 pos, BallContainer container)

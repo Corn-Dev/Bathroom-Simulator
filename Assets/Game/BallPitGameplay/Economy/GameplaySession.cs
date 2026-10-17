@@ -30,6 +30,11 @@ namespace BallPitGameplay
         private EconomySaveParticipant saveParticipant;
         private BallPitSession.BallPitGameAdapter adapter;
         private PaletteService paletteService;
+        private PaletteApplier paletteApplier;
+        // Parallel to ContainerRegistry.All: the MassFillView on each container (null entry = no mass view), resolved
+        // once at build/seed so UpdateContainerFills can push the display colour with NO per-frame GetComponent. The
+        // container's resolved IContainerFillView is PRIVATE, so GameplaySession resolves its own reference here.
+        private readonly Dictionary<BallContainer, MassFillView> massViews = new Dictionary<BallContainer, MassFillView>();
         private bool subscribed, built, isHost;
         private float startTime;
 
@@ -77,6 +82,10 @@ namespace BallPitGameplay
 
         /// <summary>Lets PaletteApplier share its PaletteService so colour names resolve in the read model.</summary>
         public void SetPaletteService(PaletteService service) => paletteService = service;
+
+        /// <summary>Lets PaletteApplier share itself so container fills recolour to the displayed (post colour-blind)
+        /// ball colour on this peer.</summary>
+        public void SetPaletteApplier(PaletteApplier applier) => paletteApplier = applier;
 
         // ------------------------------------------------------------------ Build / teardown
 
@@ -143,7 +152,18 @@ namespace BallPitGameplay
             for (int i = 0; i < containers.Count; i++)
             {
                 BallContainer c = containers[i];
-                if (c != null) c.SetFill(readModel.SoldFraction(c.ColorIndex));
+                if (c == null) continue;
+                c.SetFill(readModel.SoldFraction(c.ColorIndex)); // unchanged fraction path (today's behavior)
+                // Push the displayed ball colour to a cached MassFillView so the fill matches the ball colour this peer
+                // sees (incl. colour-blind). Resolve-once per container: a container not yet in the cache is looked up
+                // and stored (null if it has no MassFillView), so there is NO per-frame GetComponent on the hot path.
+                if (paletteApplier == null) continue;
+                if (!massViews.TryGetValue(c, out MassFillView mv))
+                {
+                    mv = c.GetComponentInChildren<MassFillView>(true);
+                    massViews[c] = mv;
+                }
+                if (mv != null) mv.SetColor(paletteApplier.DisplayColor(c.ColorIndex));
             }
         }
 
@@ -175,6 +195,7 @@ namespace BallPitGameplay
             attribution = null;
             readModel = null;
             core = null;
+            massViews.Clear(); // a rebuilt world re-resolves each container's MassFillView
         }
 
         // ------------------------------------------------------------------ Networked object wiring
