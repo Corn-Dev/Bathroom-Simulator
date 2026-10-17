@@ -142,11 +142,34 @@ the renderer). Not blocking; lowest-risk piece.
   pure fakery (instanced movers, a stream, or nothing). This extends the pit's "real
   where it matters, data where it doesn't" rule to delivery, and bounds the real-ball
   cost of every future tool.
-- **The deposit should FEEL satisfying [DECIDED intent; mechanic TBD by playtest].** Not
-  fiddly. Whether a thrown ball physically lands-and-settles THEN sells, vs sells on
-  contact and spawns into the fill, is a FEEL call to be made by trying it in the kiddie-
-  pool slice — not decided on paper. Default to building the physical land-and-settle
-  version first (more satisfying) with a bit of sale juice (plonk/pop, counter tick).
+- **Deposit is PHYSICAL; sell-on-cross, settle-after [DECIDED 2026-10].** Players must
+  physically move balls into a container (throw by hand now; tools later). NO hold-to-
+  deposit-from-inventory shortcut — the physicality is the point. Mechanic: money/credit
+  fires the moment the ball's CENTRE crosses the intake box (responsive, instant feel),
+  and the SAME ball then continues physically into the container and visibly joins the
+  fill (so you see it land/settle). So: sell on cross + settle visually after, with a bit
+  of sale juice (plonk/pop). Revisit only if playtest shows throwing-to-sell is
+  frustrating.
+- **Upgrades: an in-world UPGRADE STATION, not a menu key [DECIDED 2026-10].** The player
+  walks up to a physical upgrade place in each area and interacts; no Tab/hotkey shop.
+  This is the per-tier shop of §1b made diegetic (each area's station is that tier's
+  store; it closes when the area is finished). The placeholder Tab shop is retired into
+  this station screen.
+- **Progress is read from SCENERY, not a HUD counter [DECIDED 2026-10].** The on-screen
+  per-colour ball counter was test scaffolding and is removed. Players gauge progress
+  from the world: the pit visibly shrinking and the containers visibly filling (the two
+  rules above). Diegetic container labels/signage are allowed if a tutorial playtest
+  shows players are lost; the HUD counter does not come back. (Money display is still
+  on-screen for now — showing money diegetically is an open question, parked.)
+
+## 2b. The kiddie pool = the tutorial [DECIDED 2026-10]
+
+- Pit #1 (§1b) is the tiny rubber kids' pool and doubles as the tutorial. It is
+  **hands-only, one ball at a time** (no Second Hand on this level — possibly no upgrades
+  at all here). It teaches the pure loop: grab → throw → sort by colour → watch the
+  container fill. Built with the SAME pit system, tiny (§9b), above-ground (its box sits
+  ON the floor, not sunk). It is the first vertical slice built close-to-real (rough art
+  OK) to lock the FEEL of the loop before the rest of the campaign is authored.
 - Pushing tools (broom, blower) only move balls on the floor; never feed a container.
 - Helpers (drones, bots) make piles; only upgrades let them deliver (first "own color
   only", then delivery into that color's container).
