@@ -14,14 +14,17 @@ namespace BallPitGameplay
         [SerializeField] private GameplaySession session;
         [Tooltip("Money text.")]
         [SerializeField] private TMP_Text moneyText;
-        [Tooltip("Per-colour progress (one line per colour).")]
-        [SerializeField] private TMP_Text colorsText;
         [Tooltip("Carry count + current tool.")]
         [SerializeField] private TMP_Text carryText;
         [Tooltip("Recent sale/purchase feed.")]
         [SerializeField] private TMP_Text feedText;
         [Tooltip("Refresh interval (s).")]
         [SerializeField, Min(0f)] private float refreshInterval = 0.25f;
+        [Tooltip("DEV ONLY: when on, rebuild the retired per-colour balls-left/%-sold list into colorsText. The shipped " +
+                 "HUD reads progress from scenery (shrinking pit + filling containers), not this counter (design §2).")]
+        [SerializeField] private bool showColorCountsDev = false;
+        [Tooltip("DEV ONLY: the per-colour counter field, used only while showColorCountsDev is on.")]
+        [SerializeField] private TMP_Text colorsText;
 
         private readonly StringBuilder sb = new StringBuilder(256);
         private float nextRefresh;
@@ -55,7 +58,9 @@ namespace BallPitGameplay
 
             if (moneyText != null) moneyText.text = "Coins: " + m.Money;
 
-            if (colorsText != null)
+            // The per-colour counter is retired from the shipped HUD (design §2 — progress is read from scenery).
+            // It survives only as an opt-in dev readout gated behind showColorCountsDev. The read model is untouched.
+            if (showColorCountsDev && colorsText != null)
             {
                 sb.Clear();
                 int colors = m.ColorCount;

@@ -1,5 +1,7 @@
-// ShopPanel: the placeholder team shop (brief §4.6; game-design §2 shared upgrades). Opens on PlayerButton.Shop (Tab)
-// from the local player's input, lists the catalog with level/cost/prereqs, and a Buy button that sends a buy INTENT
+// ShopPanel: the placeholder team shop (brief §4.6; game-design §2 shared upgrades). Opens via SetOpen(true) from an
+// in-world UpgradeStation (design §2 — upgrades are a diegetic station, not a Tab/hotkey menu); a dev-only devToggleKey
+// re-enables the old Tab toggle for station-less testing. Closes on Escape (read directly under the cursor claim).
+// Lists the catalog with level/cost/prereqs, and a Buy button that sends a buy INTENT
 // through GameplaySession (GameplayNet ServerRpc in a session, core.TryBuy offline — identical validation for every
 // buyer). While open it claims the cursor (GameplayCursor), which makes PlayerInputReader free the mouse, suspend
 // aiming and block the dev harness keys. Reads only IGameplayReadModel. Any player can buy (no host privilege).
@@ -20,6 +22,9 @@ namespace BallPitGameplay
         [SerializeField] private ShopRow rowPrefab;
         [Tooltip("Refresh interval while open (s).")]
         [SerializeField, Min(0f)] private float refreshInterval = 0.2f;
+        [Tooltip("DEV ONLY: when on, Tab still toggles the shop open for station-less testing. The shipped flow opens " +
+                 "the shop ONLY from an in-world UpgradeStation (via SetOpen); leave this off (design §2).")]
+        [SerializeField] private bool devToggleKey = false;
 
         private readonly List<ShopRow> rows = new List<ShopRow>();
         private bool open, cursorClaimed;
@@ -36,13 +41,18 @@ namespace BallPitGameplay
         private void Update()
         {
             PlayerAvatar local = PlayerAvatar.Local;
-            // The Shop toggle is read DIRECTLY (not through the input seam): once the shop claims the cursor, the reader
-            // blocks its press sampling, so a seam read could never see Tab again to CLOSE the shop. A placeholder-UI
-            // panel reading its own toggle key is acceptable; aiming is still suspended by the cursor claim.
+            // Keys are read DIRECTLY (not through the input seam): once the shop claims the cursor, the reader blocks
+            // its press sampling AND PlayerInteractor early-returns at `if (!input.Active)`, so neither a seam read nor
+            // the interactor could ever see a key again to CLOSE the shop. A plain Update + direct Input read still
+            // runs under the claim, which is why the panel owns its own close keys. Aiming stays suspended by the claim.
             bool releasedLocal = local != null && local.IsReleased;
-            if (releasedLocal && Input.GetKeyDown(KeyCode.Tab)) SetOpen(!open);
+            // OPEN: shipped flow opens only via SetOpen(true) from an in-world UpgradeStation. Tab is a dev-only shortcut
+            // for station-less testing, gated behind devToggleKey. (It toggles so dev testers can also close with Tab.)
+            if (devToggleKey && releasedLocal && Input.GetKeyDown(KeyCode.Tab)) SetOpen(!open);
             if (!open) return;
             if (!releasedLocal) { SetOpen(false); return; } // the player was frozen (world change): close + release the cursor
+            // CLOSE: Escape always closes while open (runs under the cursor claim, as above).
+            if (Input.GetKeyDown(KeyCode.Escape)) { SetOpen(false); return; }
             if (Time.unscaledTime >= nextRefresh) { nextRefresh = Time.unscaledTime + Mathf.Max(0.05f, refreshInterval); Rebuild(); }
         }
 

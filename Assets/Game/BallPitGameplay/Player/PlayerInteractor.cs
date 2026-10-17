@@ -29,6 +29,14 @@ namespace BallPitGameplay
         bool CanTarget(PlayerInteractor who);
     }
 
+    /// <summary>An interactable that reacts to the primary pressed-edge as an "activate" (e.g. an UpgradeStation opening
+    /// the shop). When the aimed target implements this and primary fired, PlayerInteractor.Update calls Activate and
+    /// CONSUMES that edge (it is NOT forwarded to the tool), so activating never drops or throws a held ball.</summary>
+    public interface IInteractableActivate
+    {
+        void Activate(PlayerInteractor who);
+    }
+
     /// <summary>A pluggable hand tool: arms now; B's vacuum and others later.</summary>
     public interface IPlayerTool
     {
@@ -131,12 +139,33 @@ namespace BallPitGameplay
             if (a.PocketHeld(slot)) a.TryGrab(slot, id);
         }
 
+        // Carry-2 knock fix: the next ball must NOT be promoted onto the exact hand point the just-thrown ball still
+        // occupies, or the two interpenetrate and PhysX shoves the thrown ball sideways. Spawn the next one BEHIND the
+        // hand along the aim (opposite the throw) by ~1.1 ball diameters, so it is clear of the departing ball. Pure and
+        // Unity-free apart from Vector3, so it unit-tests. Non-finite aim falls back to the hand (no offset).
+        public static Vector3 PromoteOffset(Vector3 hand, Vector3 aimDir, float diameter)
+        {
+            Vector3 dir = aimDir.normalized;
+            if (!MotorMath.Finite(dir) || dir.sqrMagnitude < 1e-6f) return hand;
+            return hand - dir * (1.1f * Mathf.Max(0f, diameter));
+        }
+
+        // The ball diameter from the world (visual radius * 2); a safe 0.5 m fallback matches the design ball size.
+        private static float BallDiameter(BallPitFinalController c)
+        {
+            PitWorld w = c != null ? c.World : null;
+            float r = w != null ? w.VisualRadius : 0f;
+            return r > 0f ? r * 2f : 0.5f;
+        }
+
         // Smart release: when aiming at a container whose colour the held ball does NOT match but a pocketed ball does,
         // swap so the matching ball is thrown first (host). Then release along the given velocity; promote the next.
         private void ReleaseSmart(PlayerInteractor who, BallPitFinalController c, in InteractionTarget target, Vector3 velocity)
         {
             PitAuthority a = c.Authority;
             int slot = c.LocalSlot;
+            Vector3 aimDir = who.View != null ? who.View.AimRay.direction : Vector3.forward;
+            float diameter = BallDiameter(c);
             if (a != null && (uint)slot < PitAuthority.MaxPlayers && target.Kind == InteractionTargetKind.Container &&
                 target.Interactable is BallContainer container)
             {
@@ -144,17 +173,18 @@ namespace BallPitGameplay
                 PitWorld w = c.World;
                 if (held >= 0 && w != null && w.Store.color[held] != container.ColorIndex && a.HopperCount(slot) > 0)
                 {
-                    // One swap handles the common 2-deep case: pocket the current, promote the next.
+                    // One swap handles the common 2-deep case: pocket the current, promote the next (offset behind the hand).
                     Vector3 hand = who.View != null ? who.View.GetHoldPoint(HoldPointTime.Simulation) : w.PitCenter;
-                    if (a.PocketHeld(slot)) a.PromoteFromHopper(slot, hand);
+                    if (a.PocketHeld(slot)) a.PromoteFromHopper(slot, PromoteOffset(hand, aimDir, diameter));
                 }
             }
             Release(c, velocity);
-            // After the throw, bring the next pocketed ball to hand so the stack stays "in hand".
+            // After the throw, bring the next pocketed ball to hand so the stack stays "in hand" — but offset behind the
+            // hand so it does not interpenetrate the ball that was just thrown from the hand point.
             if (a != null && (uint)slot < PitAuthority.MaxPlayers && a.HeldId[slot] < 0 && a.HopperCount(slot) > 0)
             {
                 Vector3 hand = who.View != null ? who.View.GetHoldPoint(HoldPointTime.Simulation) : (c.World != null ? c.World.PitCenter : Vector3.zero);
-                a.PromoteFromHopper(slot, hand);
+                a.PromoteFromHopper(slot, PromoteOffset(hand, aimDir, diameter));
             }
         }
 
@@ -399,6 +429,17 @@ namespace BallPitGameplay
             int p = input.PressCount(PlayerButton.Primary), s = input.PressCount(PlayerButton.Secondary);
             bool primary = p != lastPrimary, secondary = s != lastSecondary;
             lastPrimary = p; lastSecondary = s;
+
+            // Activate ordering: if the aimed interactable wants the primary edge as an "activate" (e.g. an UpgradeStation
+            // opening the shop) and primary fired this frame, call Activate and CONSUME the edge so it is NOT forwarded to
+            // the tool below — otherwise ArmsTool would drop/throw a held ball on the same press. A Terminal target carries
+            // no ball and ArmsTool only grabs on Kind==Ball, so Ball/None/Container paths are unaffected.
+            if (primary && target.Interactable is IInteractableActivate activate)
+            {
+                Safe(target.Interactable, () => activate.Activate(this));
+                primary = false;
+            }
+
             if (tool == null) return;
             InteractionTarget t = target;
             try { tool.Tick(this, in t, primary, secondary); }
