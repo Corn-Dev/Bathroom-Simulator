@@ -1,0 +1,7 @@
+{
+  "task_id": "task-kiddie-pool-slice",
+  "task_description": "Deliverable C: the kiddie-pool vertical slice. Make deposits physical (sell-on-cross, settle-after) and visible (cheap colored container fill), add sale juice, replace the Tab shop with an in-world UpgradeStation, remove the per-color counter HUD, fix the carry-2 first-ball throw bug, and add kiddie-pool authoring support (tiny above-ground pit + placeholder container prefab via the editor menu) plus handoff docs. Approved design: DESIGN-C.md; authoritative spec: BRIEF-C-kiddie-pool-slice.md. No Unity compiler on this machine: verification is cross-file signature tracing; the OWNER compiles and play-tests.",
+  "status": "in_progress",
+  "feature_order": ["FEAT-001", "FEAT-002", "FEAT-003"],
+  "blocked_reason": null
+}
