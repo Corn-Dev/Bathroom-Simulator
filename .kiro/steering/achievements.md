@@ -5,8 +5,11 @@ inclusion: manual
 # Steam Achievements — design (companion to game-design.md)
 
 Status: a DESIGN proposal (not built). The achievement framework lands in Phase B+.
-All names are placeholders. Pit-size achievements map to pit profile keys, so they
-follow whatever sizes ship. Phase tags: C = Phase 2 tools, D = Phase 3, E = Phase 4;
+All names are placeholders. Pit-size / completion achievements map to the authored
+SHIPMENT steps' pit profile keys (one venue, pit reconfigured per shipment — see
+game-design.md §1b), so they follow whatever sizes ship. Phase/tier tags: C = Tier 2
+tools, D = Tier 3, E = Tier 4 automation (automation IS in v1 but is the LAST-scoped
+tier, so E achievements are late, not cut);
 if a tagged tool was cut in game-design.md, drop its achievement.
 
 ## Principles
@@ -59,10 +62,10 @@ wrong container — 75% · 5 Retail Therapy — buy first upgrade — 75% · 6 C
 100% while all others <50% — 8% · 21 Last Ball Standing — sell a pit's final ball —
 20% · 22 Mountaineer — stand on a ≥2 m pile outside the pit — 20%
 
-### Completion (one per pit profile + meta)
-23 Kiddie Pool Champion — smallest — 45% · 24 Party Pooper — 2nd size — 30% ·
-25 Warehouse Clearance — 3rd — 18% · 26 The Big Drain — biggest — 10% · 27 Drainmaster
-— every size — 6%
+### Completion (one per shipment step + meta)
+23 Kiddie Pool Champion — clear the tutorial pit — 45% · 24 First Shipment — clear the
+first main shipment — 30% · 25 Warehouse Clearance — clear a mid shipment — 18% ·
+26 The Big Drain — clear the finale — 10% · 27 Drainmaster — clear every shipment — 6%
 
 ### Skill
 28 Three-Pointer — sell a 10 m throw — 40% · 29 Half-Court Heave — 25 m — 10% ·

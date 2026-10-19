@@ -1,0 +1,30 @@
+{
+  "verdict": "CHANGES_REQUESTED",
+  "findings": [
+    {
+      "id": 1,
+      "severity": "MEDIUM",
+      "doc": "STEERING-ALIGNMENT.md",
+      "where": "Item B5 / game-design.md §1c header (line 102)",
+      "problem": "B5's quoted old-text starts at the first bullet, so the §1c section header 'Loading / fill performance for the campaign [DECIDED approach]' is left unedited. A live 'campaign' string survives, contradicting the doc's repeated assertion (B12/B13/B14, the §5/§7/§9b no-change NOTE, and the revision summaries) that none survive. Same miss-class the two prior reviews already flagged.",
+      "fix": "Add a header edit to B5: Old '## 1c. Loading / fill performance for the campaign [DECIDED approach]' -> New '## 1c. Loading / fill performance for the main loop [DECIDED approach]', and correct the 'no live campaign string survives' assertions to include the header once applied."
+    },
+    {
+      "id": 2,
+      "severity": "NIT",
+      "doc": "STEERING-ALIGNMENT.md",
+      "where": "Item B3b",
+      "problem": "B3b edits 'each new pit' -> 'the pit' but embeds a hedge ('the plural was arguably defensible') inside the proposed replacement, leaving the applier an undecided choice in an edit doc.",
+      "fix": "Keep singular as the recommended New text; move the hedge into the §E flag list as 'B3b: recommend singular; owner may keep plural since refills grow the pit.'"
+    },
+    {
+      "id": 3,
+      "severity": "NIT",
+      "doc": "STEERING-ALIGNMENT.md",
+      "where": "Sections C and D",
+      "problem": "achievements.md and networking-and-pit.md both have 'inclusion: manual' front-matter (not auto-loaded per session, unlike product.md/game-design.md). D2's rationale ('so a tech-focused session lands on the current framing') slightly overstates reach for a manual-inclusion file.",
+      "fix": "Note in C/D that these two files are manual-inclusion, so the cross-pointer matters most from product.md/game-design.md (already covered)."
+    }
+  ],
+  "reviewDoc": "c:\\Users\\cohen\\Desktop\\Game Dev\\Active_Projects\\Bathroom Simulator\\docs\\direction\\review.md"
+}

@@ -14,6 +14,14 @@ default we can revisit.
 > Companion to `product.md` and `game-design.md`. Those two reference this file
 > for "why the pit is data, not thousands of objects." This is that doc.
 
+> **Game structure (2026-10):** the game is a BALL-PIT FACTORY; one venue, one pit
+> location, the pit reconfigured in place into successive "shipment" pits toward a
+> ~1M finale — see `docs/direction/GAME-DIRECTION.md` and game-design.md §1b. The pit
+> tech below is STRUCTURE-AGNOSTIC and unchanged by this: shipment switches ride the
+> same `PitWorldBuilt`/`PitWorldDisposed` events, one live session, no host restart.
+> (An earlier "4–5-pit linear door campaign" framing is superseded; the tech reuse is
+> identical either way.)
+
 > **STATUS (2026-10): Phase A WORKING in-editor (host single-player).** First-person
 > spawn, WASD/look/jump/sprint, drop into pit, stand on pile, wall-climb + mantle
 > (incl. while carrying), grab/drop/throw with crosshair tint + highlight — all pass.
