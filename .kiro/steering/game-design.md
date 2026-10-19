@@ -62,6 +62,39 @@ assuming something works.
 
 ---
 
+## 0b. STANDING ENGINEERING PRINCIPLES [DECIDED 2026-10 — apply to all gameplay work]
+
+These exist because the game was drifting toward a HAND-ASSEMBLED, hardcoded scene
+(e.g. a lone large pit with manually-placed GameObject walls; containers whose color
+was hand-typed to match a ball color). That does not scale to a campaign OR freeplay.
+Build systems, not one-off scenes.
+
+- **DATA-DRIVEN, not hardcoded. Build PARAMETERS + reusable PRESETS; author SEQUENCES
+  from them.** A pit is fundamentally just **the ball-volume box dimensions + colors**;
+  the walls/deck/room around it are ART assets placed in the scene (that part is fine
+  to place by hand). Capture a pit as a reusable **PitPreset** (size + color count +
+  container layout + which tools are available), as a prefab/ScriptableObject. The
+  CAMPAIGN is then "an authored ordered list of presets"; FREEPLAY is "the player picks
+  a preset / tweaks the parameters." Same system, two front-ends. Do NOT bake campaign
+  assumptions into gameplay systems.
+- **DESIGN EVERY SYSTEM TO WORK IN BOTH CAMPAIGN AND FREEPLAY.** Freeplay is a
+  first-class lens, not an afterthought. Before building anything, ask "does this work
+  if the player chose the parameters instead of the campaign authoring them?" Freeplay
+  lets players pick pit size, color count, which colors (incl. future hard modifiers
+  like near-identical shades — a freeplay-only idea), and a tool-start setting (start
+  with none / a tier / all). Campaign presets should be loadable by freeplay too (and
+  freeplay may later offer MORE than the campaign ships — later scope).
+- **CONTAINERS SELF-CONFIGURE from their color.** A container's `colorIndex` is the
+  only thing authored; its DISPLAY color (and label) must DERIVE from the active
+  palette automatically — never hand-matched. Hand-typing a container's color to match
+  its ball color is a bug waiting to happen (a palette change silently breaks it). This
+  is a concrete near-term cleanup (today they're hand-colored in the scene).
+- **The first concrete payoff of this is the PitPreset system** — likely a more
+  foundational next build than placing more hand-made pits, because the campaign,
+  freeplay, and the shipment switch all sit on top of it. (Flagged in §12.)
+
+---
+
 ## 1. The game [DECIDED]
 
 - Co-op 1–4, first person, Steam, ~$5. Final art is the owner's; code provides
@@ -219,6 +252,41 @@ assuming something works.
   zones). Code never assumes a fixed layout/hierarchy.
 - **Moving balls are grabbable like resting ones;** players walk the pile, climb walls,
   mantle out, so nobody gets stuck.
+
+## 2c. Container visual direction: PNEUMATIC TUBES (creature skin later) [DECIDED 2026-10]
+
+The container's LOOK/FEEL (the thing the owner was unhappy with as plain tanks) is
+decided. Plain tanks/bins/silos are OUT. All of this is an ART + VFX skin over the
+SAME existing system (a colored intake box that sells on center-cross + a fill driver,
+`MassFillView` / `BallContainer`) — picking this costs nothing architecturally.
+
+- **v1 = PNEUMATIC TUBES.** Each color has a floor-level intake MOUTH that SLURPS balls
+  up with a satisfying whoomp and rockets them through CLEAR OVERHEAD PIPES across the
+  factory ceiling to that color's collection point. The deposit MOMENT (suck-up +
+  balls flying through transparent pipes overhead) is the juice; a tank/belly shows the
+  0→100% fill. Horizontal/floor-level intake = no upward throw, forgiving (§2
+  sell-on-cross). The travel through the pipe is "movie magic" (§2) — instanced/faked
+  movers, not real physics.
+- **LIKELY LATER: the HUNGRY CREATURE skin (B).** A strong candidate to layer ON the
+  tube system — the collection point is a goofy color-creature that gets fatter/happier
+  (0% hungry → 100% stuffed), FED by the pneumatic tube. Creature = satisfying
+  *container*; slurp-feed = satisfying *action*. "All creatures stuffed = you win" is a
+  great ending image. Not v1-committed; revisit after the tube system feels good.
+- **WRONG-COLOR RETURN via pipe [DECIDED].** A wrong-color ball that enters a mouth is
+  not stored — it travels a RETURN pipe back OVER the pit area and drops back into the
+  pit (reuses the existing wrong-color return-to-pit rule, §10, just routed visibly
+  through a pipe instead of dropping from nowhere). Diegetic + readable: "wrong color
+  → it comes back."
+- **PLAYER SUCTION toy-box feature [DECIDED — fun, keep gentle].** If a player gets too
+  close to a tube mouth they can be SUCKED into the pipe and dropped back out (over the
+  pit / at a pipe exit) — co-op comedy, same spirit as throw-knockback. MUST be tuned
+  GENTLE: a suction pull only in a small zone right at the mouth, never a strong
+  always-on vacuum that traps players or ruins normal depositing. A toy, not a hazard;
+  tune so it's funny, not frustrating. (Implementation: a small suction trigger at the
+  mouth that, above a proximity threshold, carries the player through and respawns them
+  at the exit — like the ball return path but for a player body.)
+- Container art is still per-area/themed (§1b) — the tube/creature designs can vary per
+  shipment theme; the system underneath is unchanged.
 
 ## 2b. The kiddie pool = the tutorial [DECIDED]
 
@@ -395,6 +463,22 @@ Automation IS in scope (it's the end-game power fantasy for the huge pits and th
 - Deliverable C owner-questions (fill style, settle dwell time, kiddie dims, dev
   toggles, colorblind) — see `docs/handoff-C/DECISIONS-C.md`.
 - Money shown on-screen for now; whether to make it diegetic later is parked.
+- **Container FILL fantasy across the run [OPEN].** Decided: one PERSISTENT container
+  per color that fills toward 100% by the finale (no shipment/truck "ship-out" — owner
+  disliked that). Open: how the fill is SCALED so every pit visibly moves it rather
+  than the ~1M finale dwarfing all earlier pits (fill by "fraction of each pit's balls
+  of this color delivered," i.e. per-pit chunks, NOT linear ball count). Visual = the
+  pneumatic-tube system (§2c). Tune the scaling when the economy/pacing is tuned.
+
+**Foundational engineering TODOs (from the §0b principles) [NEAR-TERM]:**
+- **PitPreset system** — make a pit a data-driven, loadable preset (box dims + colors +
+  container layout + tool availability), used by BOTH campaign (ordered list) and
+  freeplay (player picks/tweaks). Replaces the current hand-assembled "large pit +
+  manually-placed GameObject walls" scene. Likely the most foundational next build.
+- **Containers self-configure color** from `colorIndex` + the active palette (stop
+  hand-coloring them in the scene). Small, near-term.
+- **Freeplay parameterization** — expose pit size / color count / colors / tool-start
+  setting; load campaign presets. (Later scope, but design toward it now per §0b.)
 
 **Key integration risk [UNPROVEN]:**
 - **Shipment rebuild mid-session over the network** with carried economy + client
