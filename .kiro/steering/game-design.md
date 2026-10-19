@@ -320,3 +320,17 @@ the renderer). Not blocking; lowest-risk piece.
   scatter (`PlayerConfig.playersDisturbPile` seam, off), MEDIUM host carry-mantle
   stall, balls-go-black on editor focus loss (likely editor-only).
 - Queued optimization: speed up RandomFill GENERATION for custom mode + dev baking.
+- **CLIENT frame drops IN THE PIT, not on the deck (reported 2026-10, multi-machine
+  playtest) [TO DIAGNOSE].** Host was smooth, two clients hitched when standing in the
+  pile. Prime suspect is CLIENT-ONLY near-pile cost, NOT the network transport (transport
+  would hitch regardless of position): `ClientPitColliders` (`Assets/Game/BallPitGameplay/
+  Player/`) rebuilds the local player's collider SHELL + kinematic live-ball PROXIES every
+  fixed step only when the player is near balls — exactly "in the pit, not on the deck".
+  Second suspect: in-pile RENDER cost (the camera sees far more exposed balls up close
+  inside the pile). DIAGNOSE FIRST (don't tune blind): a client reproduces with the
+  Console open — look for `[ClientPitColliders] the client collider shell is full (…)`;
+  and a Unity Profiler frame while hitching — is the spike in Physics or in Camera/render?
+  LEVERS (all serialized on the PlayerSpawner's `PlayerPitPhysicsConfig`, inspector-only,
+  reversible): `liveProxyBudget`, `liveProxyRange`, `clientShellKeepSeconds`,
+  `clientShellMaxColliders`, `colliderReleasePerStep`. Deeper fix if config isn't enough:
+  throttle/spread the client shell+proxy maintenance across frames. Not a networking bug.
