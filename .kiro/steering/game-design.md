@@ -288,15 +288,26 @@ SAME existing system (a colored intake box that sells on center-cross + a fill d
 - Container art is still per-area/themed (§1b) — the tube/creature designs can vary per
   shipment theme; the system underneath is unchanged.
 
-## 2b. The kiddie pool = the tutorial [DECIDED]
+## 2b. The kiddie pool = the tutorial = "the interview" (OUTSIDE) [DECIDED 2026-10]
 
-- The first pit is the tiny rubber kids' pool and doubles as the tutorial. **Hands-only,
-  one ball at a time** (no carry upgrade here — possibly no upgrades at all on this
-  pit). It teaches the pure loop: grab → throw → sort by color → watch the container
-  fill. Built with the SAME pit system, tiny (§9b), ABOVE-GROUND (its box sits on the
-  floor, not sunk). It is the first vertical slice built close-to-real (rough art OK) to
-  lock the FEEL before the rest of the run is authored. Likely second beat: a shipping-
-  container pit (§1b).
+- **The tutorial is framed as a JOB INTERVIEW, and it happens OUTSIDE the factory.** The
+  player starts in an exterior yard (loading lot / factory entrance) at a tiny rubber
+  kids' pool of balls, with a "BALL-PIT FACTORY — NOW HIRING" vibe. Sorting the little
+  pool IS the tryout. This gives the tutorial narrative motivation ("you're interviewing
+  for the job") instead of just "here's a small pool then a big one," and it makes the
+  size jump make sense (a tiny pool outside, the huge operation inside).
+- **On passing, the big warehouse GARAGE DOOR rolls up**, the player walks into the real
+  factory, and the **door closes behind them** (one-way, matches §1b's no-backtracking).
+  The door open/close is the shipment-style transition (§1b) that hides the
+  dispose→rebuild from the outside pit to the first inside pit — same tech, nice story.
+- **Hands-only, one ball at a time** here (no carry upgrade — possibly no upgrades at
+  all on the interview). Teaches the pure loop: grab → throw/sweep → sort by color →
+  watch the container fill. Built with the SAME pit system, tiny (§9b), ABOVE-GROUND.
+- Authoring note: "outside" is just another authored PitSite area (a small exterior
+  yard + the pool + the garage door). A bit more art than reusing the warehouse floor,
+  but small, and the interview→door→inside beat is worth it. First vertical slice built
+  close-to-real (rough art OK) to lock the FEEL before the rest of the run is authored.
+  Likely second beat (first INSIDE pit): a shipping-container pit (§1b).
 
 ## 3. Tools by tier — framed as FACTORY equipment [PROPOSED unless marked]
 
