@@ -364,17 +364,21 @@ namespace BallPitGameplay
             // 7-8. Environment + rebuild in place.
             var env = new PitSiteEnvironment(site);
             bool done = false, built = false;
-            controller.RebuildActivePit(s, bounds, env, site, site.OverviewCamera, (ok, msg) => { done = true; built = ok; });
+            controller.RebuildActivePit(s, bounds, env, site, site.OverviewCamera, (ok, msg) =>
+            {
+                // 10. Refresh the adapter's build-time snapshot (FILL/siteId, hopper ops) so saves record this pit. Done HERE, in the
+                // controller's own call stack right after MarkWorldReady, not after the wait loop below: the loop resumes a frame
+                // later, and a save tick in that gap would pair the new world with the previous pit's FILL.
+                if (ok && adapter != null && BallPitFinalController.SessionDriven) adapter.OnCampaignPitRebuilt(env);
+                done = true;
+                built = ok;
+            });
 
             // 9. Wait for the build (a detached/abandoned build never calls back).
             float deadline = Time.unscaledTime + Mathf.Max(1f, advanceTimeoutSeconds);
             while (!done && Time.unscaledTime < deadline) yield return null;
             if (!done) { Debug.LogError("[CampaignDirector] timed out waiting for the next pit to build", this); finished(false); yield break; }
-            if (!built) { finished(false); yield break; }
-
-            // 10. Refresh the adapter's build-time snapshot (FILL/siteId, hopper ops) so saves record this pit.
-            if (adapter != null && BallPitFinalController.SessionDriven) adapter.OnCampaignPitRebuilt(env);
-            finished(true);
+            finished(built);
         }
 
         // ------------------------------------------------------------------ Client: follow the replicated index

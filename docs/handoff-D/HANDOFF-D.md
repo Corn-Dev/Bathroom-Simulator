@@ -89,8 +89,9 @@ CampaignDirector.Instance?.EnsureFirstPit(null);
 4. Inside `RebuildActivePit`: `netPit?.BeginRebuild()` -> `BuildRoutine` (its first step is `DisposePit`, which raises
    `PitWorldDisposed`) -> on success `OnCampaignRebuilt`: `netPit.RebindAuthority(authority)` (host), `ToolFilter`
    (session only), `MarkWorldReady()` (raises `PitWorldBuilt`), then the callback.
-5. `HostRebuildWork` waits for the callback (timeout `advanceTimeoutSeconds`), then (session only)
-   `adapter.OnCampaignPitRebuilt(env)`.
+5. The director's callback (session only) calls `adapter.OnCampaignPitRebuilt(env)` right there, in the same call
+   stack as `MarkWorldReady`, so no save tick can pair the new world with the previous pit's FILL.
+   `HostRebuildWork` meanwhile waits for the callback (timeout `advanceTimeoutSeconds`).
 
 **Client follow, in order** (`CampaignNet.entryIndex` changes -> `OnReplicatedIndexChanged` -> `ClientFollow`, which
 starts with `yield return null`): `ClientWork`:
