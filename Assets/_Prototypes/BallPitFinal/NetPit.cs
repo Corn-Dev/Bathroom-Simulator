@@ -66,12 +66,14 @@ namespace BallPitFinal
             public byte[] syncDoneMarker;
             public float tokens;
             public int[] lastSent;
+            public bool forceFullNextReady; // Deliverable D: first OnReady after RebindAuthority always sends a FULL sync
             public Vector3 viewPos, hand, toolPoint;
             public byte tool;
             public float lastViewTime = -100f;
         }
 
         private PitAuthority A;
+        private bool rebuilding; // Deliverable D: true from BeginRebuild() until RebindAuthority(); A is a disposed world meanwhile
         private readonly Dictionary<ulong, Link> links = new Dictionary<ulong, Link>();
         private readonly List<Link> linkList = new List<Link>();
         private byte[] evBuf = new byte[8192];
@@ -122,6 +124,38 @@ namespace BallPitFinal
 
         public int ClientCount => linkList.Count;
 
+        /// <summary>Host (Deliverable D). Call BEFORE the controller disposes the old pit (BallPitFinalController.RebuildActivePit).
+        /// Detaches the old authority's event sink and freezes every host path that reads A until RebindAuthority.</summary>
+        public void BeginRebuild()
+        {
+            if (!IsHost) return;
+            rebuilding = true;
+            if (A != null && ReferenceEquals(A.Events, this)) A.Events = null;
+        }
+
+        /// <summary>Host (Deliverable D). Re-point at the NEW authority and re-issue the header to every connected link. Reuses the
+        /// existing Header/Ready/Rel messages; no wire change.</summary>
+        public void RebindAuthority(PitAuthority newAuthority)
+        {
+            if (!IsHost || newAuthority == null) return;
+            if (A != null && !ReferenceEquals(A, newAuthority) && ReferenceEquals(A.Events, this)) A.Events = null;
+            A = newAuthority;
+            A.Events = this;
+            evLen = 0; evCount = 0; evBaseTick = 0; sendAccum = 0f;     // no old-world event bytes leak into the new world
+            for (int i = 0; i < linkList.Count; i++)
+            {
+                Link l = linkList[i];
+                l.streaming = false;                                    // the client's next OnReady re-queues a sync
+                l.live = false;                                         // no snapshots until the new sync completes
+                l.lastSent = new int[A.Store.Capacity];                 // sized to the NEW store
+                l.syncDoneMarker = null;
+                l.outq.Clear();                                         // drop queued old-world sync/live batches
+                l.forceFullNextReady = true;                            // equal dims+seed+colours would give an equal checksum
+                SendHeader(l);                                          // best-effort fast path; the client's Hello is the closer
+            }
+            rebuilding = false;
+        }
+
         private void OnClientConnected(ulong clientId)
         {
             if (!IsHost || clientId == NM.LocalClientId || links.ContainsKey(clientId)) return;
@@ -136,7 +170,7 @@ namespace BallPitFinal
             var link = new Link { clientId = clientId, player = player, lastSent = new int[A.Store.Capacity], tokens = N.reliableBurstBytes };
             links[clientId] = link;
             linkList.Add(link);
-            SendHeader(link);
+            if (!rebuilding) SendHeader(link); // else RebindAuthority sends the NEW header
             Debug.Log($"[BallPitNet] client {clientId} connected as player {player}");
         }
 
@@ -148,7 +182,7 @@ namespace BallPitFinal
                 return;
             }
             if (!links.TryGetValue(clientId, out var link)) return;
-            A.ThrowHeld(link.player, Vector3.zero);
+            if (!rebuilding) A.ThrowHeld(link.player, Vector3.zero); // else A is the disposed world
             links.Remove(clientId);
             linkList.Remove(link);
             Debug.Log($"[BallPitNet] client {clientId} (player {link.player}) disconnected");
@@ -186,14 +220,14 @@ namespace BallPitFinal
         /// </summary>
         private void OnHello(ulong sender, FastBufferReader r)
         {
-            if (links.TryGetValue(sender, out var link) && !link.streaming) SendHeader(link);
+            if (links.TryGetValue(sender, out var link) && !link.streaming && !rebuilding) SendHeader(link);
         }
 
         private void OnReady(ulong sender, FastBufferReader r)
         {
-            if (!links.TryGetValue(sender, out var link) || link.streaming) return;
+            if (rebuilding || !links.TryGetValue(sender, out var link) || link.streaming) return;
             r.ReadValueSafe(out ulong checksum);
-            bool full = checksum != A.W.FillChecksum;
+            bool full = link.forceFullNextReady || checksum != A.W.FillChecksum; link.forceFullNextReady = false;
             if (full) Debug.LogWarning($"[BallPitNet] player {link.player} fill checksum mismatch: sending a FULL resync ({A.Store.Count:n0} balls)");
             FlushEvents();           // everything so far is already in the store, so it is covered by the sync
             link.streaming = true;   // from now on live batches queue up behind the sync for this client
@@ -336,6 +370,7 @@ namespace BallPitFinal
         /// <summary>Host: flush events, send snapshots, pump paced reliable queues. Call once per frame (Update).</summary>
         public void HostUpdate(float dt)
         {
+            if (rebuilding) return; // Deliverable D: A is a disposed world until RebindAuthority
             sendAccum += dt;
             float interval = 1f / Mathf.Max(1f, N.sendRate);
             if (sendAccum >= interval)
@@ -414,7 +449,7 @@ namespace BallPitFinal
 
         private void OnIntent(ulong sender, FastBufferReader r)
         {
-            if (!links.TryGetValue(sender, out var l)) return;
+            if (rebuilding || !links.TryGetValue(sender, out var l)) return;
             r.ReadValueSafe(out byte type);
             switch (type)
             {
@@ -502,6 +537,19 @@ namespace BallPitFinal
             PendingBounds = new Bounds(center, size);
             HeaderPending = true;
             Debug.Log($"[BallPitNet] header: player {player}, {s.pitX * s.pitY * s.pitZ:n0} balls, fill {s.fillType}");
+        }
+
+        /// <summary>Client (Deliverable D). Clears every per-world field so OnHeader accepts the host's re-issued header, then re-sends Hello as
+        /// the FINAL step (SendHello is private; this is the only place it can be called for a rebuild). LocalPlayer is deliberately kept.</summary>
+        public void ResetClientWorldForRebuild()
+        {
+            if (IsHost) return;
+            CW = null; R = null; Synced = false; HeaderPending = false;
+            events.Clear();
+            for (int p = 0; p < heldBy.Length; p++) heldBy[p] = -1;
+            haveClock = false; clockOffset = 0; hostChecksum = 0;
+            PendingSettings = null; PendingBounds = default;
+            SendHello(); // FINAL statement
         }
 
         /// <summary>Client: the controller built the pit from PendingSettings/PendingBounds; report the checksum.</summary>

@@ -39,6 +39,17 @@ namespace BallPitSession
             moved.Clear();
         }
 
+        /// <summary>
+        /// Deliverable D: an in-session pit rebuild discards the old world, so every parked id is meaningless. Forgets the
+        /// parked owners but keeps slotOwner (connected clients stay connected). A drained pit has no parked balls anyway.
+        /// </summary>
+        public void ForgetParked()
+        {
+            parkedOwner.Clear();
+            lastSeenUtc.Clear();
+            moved.Clear();
+        }
+
         // ------------------------------------------------------------------ Restore (04 §5.4 row 1, §6.3 step 3)
 
         public string Restore(IReadOnlyList<HopperEntry> entries, PlayerId localHost, PitAuthority authority)

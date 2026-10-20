@@ -288,6 +288,22 @@ namespace BallPitSession
             Debug.Log($"[BallPitSession] host world ready ({controller.World.Store.Count:n0} balls, {controller.Authority.ParkedHopperCount:n0} parked hopper balls)");
         }
 
+        /// <summary>
+        /// Deliverable D. Host, from CampaignDirector after a successful in-session pit rebuild (PitWorldBuilt already raised).
+        /// Re-snapshots the build-time state that CaptureWorldSave and slotMirror read, so a save made in pit k records pit k's
+        /// FILL and siteId, and a leaving client's tank is parked on the live authority (not the disposed one).
+        /// </summary>
+        public void OnCampaignPitRebuilt(PitSiteEnvironment env)
+        {
+            if (!isHost || controller == null || controller.Authority == null || controller.World == null) return;
+            ActiveEnvironment = env;
+            PitFillParams fill = PitFillParams.FromWorld(controller.World);
+            fill.SiteId = env != null ? env.Site.SiteId : null; // FILL v2, same rule as OnHostPitReady
+            fillAtBuild = fill;
+            slotMirror?.RebindOps(new PitAuthorityHopperOps(controller.Authority));
+            ownership.ForgetParked(); // parked ids belong to the discarded world
+        }
+
         // A failure leaves a half-built or half-restored world, so it ends the session; the slot is not overwritten
         // because the session never reached InGame (04 §6.3).
         private void OnHostPitFailed(string detail)

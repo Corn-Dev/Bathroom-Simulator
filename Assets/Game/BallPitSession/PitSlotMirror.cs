@@ -16,7 +16,7 @@ namespace BallPitSession
     public sealed class PitSlotMirror
     {
         private readonly HopperOwnership ownership;
-        private readonly IHopperOps ops;
+        private IHopperOps ops; // not readonly: RebindOps swaps it after an in-session pit rebuild
         private readonly ISessionNetwork network;      // clientId -> PlayerId from the approval payload
         private readonly ulong localClientId;          // the host's own NGO client, never given a slot
         private readonly Dictionary<ulong, int> slotOf = new Dictionary<ulong, int>();
@@ -34,6 +34,9 @@ namespace BallPitSession
         public int TrackedCount => slotOf.Count;
 
         public bool TryGetSlot(ulong clientId, out int slot) => slotOf.TryGetValue(clientId, out slot);
+
+        /// <summary>Deliverable D: re-point at the new authority's hopper ops after an in-session pit rebuild. Null is ignored.</summary>
+        public void RebindOps(IHopperOps newOps) { if (newOps != null) ops = newOps; }
 
         /// <summary>Subscribes to the same two NGO callbacks NetPit uses. Call right after NetPit.StartHost.</summary>
         public void Attach(NetworkManager networkManager)
