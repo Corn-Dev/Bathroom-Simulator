@@ -59,8 +59,32 @@ Untangle into three buckets:
   empty.
 
 ### Step 2 — Build the permanent WAREHOUSE greybox (furniture)
+
+> **SCALE WARNING — read the sizing table before placing anything.** Pit profiles are
+> measured in BALL COUNTS (pitX/pitY/pitZ), not meters. At 0.5 m balls one profile unit
+> is ~0.5 m in X, ~0.433 m in Z and ~0.408 m per layer in Y (FCC lattice; see
+> `PitWorld.FccGeometry`). A RANDOM fill (what the game ships) is ~58% dense, so the
+> pit's real depth is taller than the layer math: roughly **0.113 m³ of pit per ball**.
+> The 20 × 12 × 2 m / ~4,000-ball pit in `LAYOUT-AND-DEPOSIT.md` is a SMALL reference
+> pit, NOT the existing `large` profile (80×60×80 balls = 384,000 balls, ~40 × 35 m
+> footprint and ~32 m deep). The 28 × 20 m deck below only fits the ~4k-ball pit.
+>
+> | Pit | Profile (X×Y×Z balls) | Balls | Footprint (m) | Approx. depth (m) |
+> |---|---|---|---|---|
+> | Kiddie pool | 10 × 2 × 10 | 200 | ~5 × 4.3 | ~1 |
+> | Reference small | ~40 × 5 × 28 | ~4,000 | 20 × 12 | ~2 |
+> | `small` (built-in) | 40 × 25 × 40 | 40,000 | 20 × 17 | ~11 |
+> | `large` (built-in) | 80 × 60 × 80 | 384,000 | 40 × 35 | ~32 |
+> | `huge` (built-in) | 100 × 100 × 100 | 1,000,000 | 50 × 43 | ~54 |
+> | 1M, WIDE + SHALLOW (author this) | ~200 × 22 × 230 | ~1,000,000 | 100 × 100 | ~12 |
+>
+> Depth grows with ball count unless you widen the footprint, so a million-ball pit is a
+> football-field-sized hole. Rule of thumb: **warehouse floor = largest pit footprint +
+> a ~6 m sort band on the container sides + 2–3 m walking lanes all round.** Decide the
+> two greybox pits in Step 3 FIRST, then size the room to the bigger of the two.
+
 Create a top-level empty `Warehouse` and under it, with primitives:
-- A floor plane (~28 × 20 m — see `docs/direction/LAYOUT-AND-DEPOSIT.md`).
+- A floor plane sized by the rule above (NOT a fixed 28 × 20 m — that only fits the ~4k-ball reference pit).
 - Four wall cubes forming the warehouse shell (tall; this is the room the pit sits in).
 - A big cube marking the **garage/loading door** on one wall (non-functional landmark now).
 - Leave the center open for the pit, and keep a wide walkable band around where the pit
@@ -72,8 +96,9 @@ contains ONLY the pit:
 1. Create an empty GameObject, e.g. `Pit_Small`. Add a `PitSite` component to it.
 2. On the `PitSite`: assign/author its **anchor** (an empty child at the pit floor
    center, rotation 0,0,0), set its **profileKey** to a size profile (e.g. a 20×12×2
-   "large" profile; for the small one a smaller profile — if the profile doesn't exist,
-   see Step 3a), give it a unique **siteId** (e.g. `pit_small`, `pit_large`).
+   from the sizing table in Step 2 — e.g. `kiddie` for the first pit and a ~4k–40k-ball
+   profile for the second; do NOT use the 384k `large` profile for a greybox, it is a
+   ~32 m deep canyon — if the profile doesn't exist, see Step 3a), give it a unique **siteId** (e.g. `pit_small`, `pit_large`).
 3. Add the pit's ART as children: wall/floor/rim cubes shaped to the pit box. (Use the
    `PitSite` cyan gizmo + "Fit Venue Bounds To Pit" context menu to size venueBounds.)
    The pit can be ABOVE-GROUND (box on the floor, e.g. the kiddie pool / shipping

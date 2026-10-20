@@ -12,6 +12,14 @@ build next. Opinionated on purpose; tuning numbers are rough and flagged.
 > is superseded by the factory/shipment steering — layout reasoning here follows
 > the steering.
 >
+> **SCALE CAVEAT (added after the first scene build):** everything in this doc is sized
+> to a ~4,000-ball REFERENCE pit. It is NOT the existing `large` profile (80×60×80 balls =
+> 384,000 balls, ~40×35 m footprint, ~32 m deep) or the ~1M finale (~100×100 m wide and
+> ~12 m deep if authored shallow). Profile pitX/Y/Z are ball counts, not meters — see the
+> sizing table in `CAMPAIGN-SCENE-SETUP.md` Step 2. The relative guidance (sunk pit,
+> floor-level mouths, ≥4 m spacing, sort band, forgiving deposit) still holds; the absolute
+> deck size (28×20 m) must be recomputed per pit.
+>
 > **Ball count for that box (consistent set used throughout):** 20×12×2 = 480 m³;
 > at ~0.58 random packing a 0.5 m ball occupies 0.0654 m³, so 480 × 0.58 / 0.0654
 > ≈ **~4,250 balls** — call it **~4,000 balls** for round math. (The earlier draft
