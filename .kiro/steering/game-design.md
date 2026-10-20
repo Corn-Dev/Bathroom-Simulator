@@ -43,6 +43,15 @@ current.
   `MassFillView` visible container fill, sale juice, in-world UpgradeStation (replaces
   Tab), color-counter HUD removed, carry-2 throw fix, kiddie-pool authoring menus.
   (Owner compiling/play-testing; see `docs/handoff-C/`.)
+- **Campaign director — Deliverable D** (`BallPitGameplay/Campaign/`, additive seams in
+  `NetPit`, a new `BallPitFinalController.Campaign.cs` partial, the adapter, and
+  `GameplaySession`) — the shipment run: a data-driven `CampaignDefinition` (ordered pit
+  PREFABS + `colorCount` each), a `CampaignDirector` that instantiates the live pit,
+  advances on a drain behind an `IPitTransition` (fade stub), rebuilds in place, and
+  replicates the entry index via `CampaignNet`; index saved; money/upgrades carried.
+  Written by trace only (NOT compiled, NOT run); the networked rebuild still needs the
+  owner's two-instance play test. See `docs/handoff-D/` (HANDOFF-D has the editor setup
+  and test checklist).
 
 **THE DIRECTION (revised 2026-10 — supersedes the earlier "4–5-pit linear door
 campaign"):** the game is set in a **BALL-PIT FACTORY**; the players are its workers.
@@ -52,10 +61,11 @@ permitting). Hands → factory tools → automation, as a continuous upgrade run
 ending. See §1/§1b. This is essentially the old campaign's escalation + tool arc,
 minus the expensive multi-room authoring.
 
-**NEXT BUILD:** continue Deliverable B/C follow-ups and then the **shipment wrapper**
-(§1b) — the dispose→rebuild-in-place pit switch behind a transition. The old
-`docs/handoff-B/BRIEF-B.md` is superseded; `docs/handoff-B/BRIEF-B-bite-a.md` and
-`docs/handoff-C/` are current.
+**NEXT BUILD:** the OWNER compiles Deliverable D and play-tests the networked shipment
+rebuild (host + client, late join, resume; `docs/handoff-D/HANDOFF-D.md` §7). Then:
+trigger-gated start / the outside "interview" spawn flow, real transitions, and the
+Deliverable B/C follow-ups. The old `docs/handoff-B/BRIEF-B.md` is superseded;
+`docs/handoff-B/BRIEF-B-bite-a.md`, `docs/handoff-C/` and `docs/handoff-D/` are current.
 
 **Current open bugs / TODOs / risks live in §12 (consolidated).** Check it before
 assuming something works.
@@ -521,7 +531,9 @@ a full-scale factory built around the final ~1M-ball pit.
 
 **Key integration risk [UNPROVEN]:**
 - **Shipment rebuild mid-session over the network** with carried economy + client
-  siteId replication + transition cover (§1b). The one piece that isn't de-risked.
+  siteId replication + transition cover (§1b). BUILT in Deliverable D (by trace only,
+  not compiled or run — `docs/handoff-D/`); still UNPROVEN until the owner's host+client
+  two-instance play test (advance, forced full resync, late join, resume).
 
 **Known bugs / perf [TO DIAGNOSE / TUNE]:**
 - **CLIENT frame drops IN THE PIT, not on the deck** (multi-machine playtest, host

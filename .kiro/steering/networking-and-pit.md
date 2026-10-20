@@ -52,6 +52,17 @@ default we can revisit.
 > **Release-readiness item (later):** `GpuBallRenderer` throws (black screen) when
 > compute/GPU is unsupported — add a graceful "GPU not supported" check before ship.
 
+> **BUILD STATUS (Deliverable D, written by trace; NOT compiled or run): additive NetPit
+> seams for an in-session pit rebuild.** `NetPit.cs` gained `BeginRebuild()`,
+> `RebindAuthority(PitAuthority)` (host), `ResetClientWorldForRebuild()` (client; ends by
+> re-sending Hello), a per-link `forceFullNextReady`, and a `rebuilding` flag guarding six
+> host entry points. Wire format and `Protocol = 3` are unchanged; with no rebuild every
+> guard is a no-op. They exist because `A` is bound once at `StartHost` and the client
+> never nulls `CW`, so a second pit in one live session was otherwise impossible without a
+> NetPit restart. `BallPitFinalController.Campaign.cs` adds `RebuildActivePit` etc. The
+> two-instance host+client advance, late join and resume are UNVERIFIED until the owner
+> play-tests them. See `docs/handoff-D/` (HANDOFF-D §2, §7).
+
 ---
 
 ## The core problem

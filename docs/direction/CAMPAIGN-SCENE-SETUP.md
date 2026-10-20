@@ -137,16 +137,27 @@ floor between the pit area and the containers (room to make color piles). Each c
   campaign just spawn in the warehouse.)
 
 ### Step 6 — Author the CAMPAIGN LIST (data) — AFTER Part B exists
-Once Part B's code exists, you'll have a `CampaignDefinition` asset. Create one at
-`Assets/Game/BallPitGameplay/Campaign/MainCampaign.asset` and fill its ordered list:
+Once Part B's code exists, you'll have a `CampaignDefinition` asset. Run the menu
+`Tools/Ball Pit/Create Campaign Definition` (creates
+`Assets/Game/BallPitGameplay/Campaign/MainCampaign.asset` with two empty entries) and fill
+its ordered `entries` list (each entry has `pitPrefab`, `colorCount` 2..8; `availableTools`
+is reserved and unused):
 - Entry 0: { pitPrefab = `Pit_Small`, colorCount = 3 }
 - Entry 1: { pitPrefab = `Pit_Large`, colorCount = 4 }
 - (add more entries later to extend the campaign — this is the scalability payoff)
 
 ### Step 7 — Wire the CAMPAIGN DIRECTOR (one object) — AFTER Part B exists
-- Add one `CampaignDirector` object to the scene. Assign its `CampaignDefinition`
-  (`MainCampaign.asset`) and references it needs (the controller, GameplaySession — Part
-  B's handoff lists the exact fields).
+- Run `Tools/Ball Pit/Create Campaign Net Prefab` (creates
+  `Assets/Game/BallPitGameplay/Campaign/BallPitCampaignNet.prefab`) and add it to the
+  kit's `NetworkPrefabsList` (the one on `MultiplayerKitBootstrap`, next to
+  `BallPitGameplayNet.prefab`).
+- Add ONE `CampaignDirector` object to the scene. Fields: `definition` =
+  `MainCampaign.asset`; `campaignNetPrefab` = `BallPitCampaignNet.prefab` (needed for
+  co-op, may stay empty offline); `transitionOverride` = leave empty (a fade stub is added
+  automatically); `advanceTimeoutSeconds` = 900. It finds the controller and adapter
+  itself; no other references are needed.
+- Delete any scene-resident `PitSite` / `siteroot`; then run `Tools/Ball Pit/Validate
+  Campaign`. The full list is in `docs/handoff-D/HANDOFF-D.md` §6.
 - It replaces the current "auto-build one pit on play" behavior: on start it builds entry
   0's pit; when that pit is drained it transitions and builds entry 1; etc.; the final
   entry's drain fires the real win.
@@ -164,6 +175,18 @@ Once Part B's code exists, you'll have a `CampaignDefinition` asset. Create one 
 ---
 
 ## PART B — CODE TO BUILD (separate implementation deliverable)
+
+> **BUILT in Deliverable D (written by trace; NOT compiled or run — the owner compiles
+> and play-tests; see `docs/handoff-D/HANDOFF-D.md`).** Real names: `CampaignDefinition`
+> (`entries` of `CampaignEntry { pitPrefab, colorCount, availableTools }`),
+> `CampaignDirector` (a plain scene MonoBehaviour, NOT a NetworkObject), `CampaignNet`
+> (host-spawned, one replicated `entryIndex`), `CampaignPitSiteSelector`,
+> `CampaignSaveParticipant` (tag `campaign`), `IPitTransition` + `FadeTransition`, and
+> the editor menus under `Tools/Ball Pit/`. Two refinements to the text below:
+> `IPitTransition.Play(IEnumerator work)` takes the director's rebuild work (so the reveal
+> is not timer-guessed), and the director calls `BallPitFinalController.RebuildActivePit`
+> (a new partial) plus small additive `NetPit` seams rather than a bare `BuildRoutine`.
+> The mental model in this doc is unchanged.
 
 Host-authoritative, works offline + networked. New code under
 `Assets/Game/BallPitGameplay/Campaign/`:
