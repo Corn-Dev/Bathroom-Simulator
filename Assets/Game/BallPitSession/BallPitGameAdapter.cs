@@ -164,6 +164,7 @@ namespace BallPitSession
             bool resume = save != null;
             // b 9.1 steps 1, 2 and 6: find, select (the save's siteId on resume) and activate. Null without an error: a
             // site-less scene, which runs today's path.
+            CampaignDirector.Instance?.EnsureFirstPit(resume ? save.Fill.SiteId : null); // Deliverable D: the first campaign pit must exist before the site scan
             PitSite site = PitSites.SelectAndActivate(SiteSelector, context.Settings, resume ? save.Fill.SiteId : null,
                                                       out _, out string siteError);
             if (site == null && siteError != null) { FailHostSetup(resume, siteError); return; }
@@ -186,7 +187,11 @@ namespace BallPitSession
                 string mismatch = site != null ? ResumeSiteMismatch(save, site, profile) : null; // b 9.1 step 4
                 if (mismatch != null) { FailHostSetup(true, mismatch); return; }
             }
-            else settings = BallPitSettingsMap.Apply(context.Settings, controller.settings, VenueConfig);
+            else
+            {
+                settings = BallPitSettingsMap.Apply(context.Settings, controller.settings, VenueConfig);
+                CampaignDirector.Instance?.ApplyEntryColors(settings); // Deliverable D: colours come from the campaign entry (new game only; a resume keeps the saved colorCount)
+            }
             // b 9.1 step 5: the anchor and the venue bounds (a new game also takes the profile's size and ball diameter).
             if (site != null && !site.TryApplyTo(settings, resume ? null : profile, out string applyError))
             { FailHostSetup(resume, applyError); return; }
@@ -319,6 +324,7 @@ namespace BallPitSession
         // site's anchor applied to the header's settings, the client collider shell and the players' layer.
         private void AttachClient(SessionLiveContext context)
         {
+            CampaignDirector.Instance?.EnsureFirstPit(null); // Deliverable D: the campaign pit (from the replicated index) must exist before the site scan
             PitSite site = PitSites.SelectAndActivate(SiteSelector, context.Settings, null, out _, out string siteError);
             if (site == null && siteError != null)
             {

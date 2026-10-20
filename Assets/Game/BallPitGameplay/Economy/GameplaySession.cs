@@ -37,6 +37,9 @@ namespace BallPitGameplay
         private readonly Dictionary<BallContainer, MassFillView> massViews = new Dictionary<BallContainer, MassFillView>();
         private bool subscribed, built, isHost;
         private float startTime;
+        // Deliverable D: with a campaign, an offline / dev-host run keeps ONE state object across pit rebuilds (a fresh core would
+        // otherwise reset money + upgrade levels). Sessions already persist through adapter.GameState. Null without a director.
+        private BallPitSession.BallPitGameState localState;
 
         /// <summary>The live read model for the HUD/shop/results; null before the first world build.</summary>
         public IGameplayReadModel ReadModel => readModel;
@@ -101,6 +104,7 @@ namespace BallPitGameplay
 
             // Core: bound to the adapter's persisted GameState when a session runs, else internal (offline).
             BallPitSession.BallPitGameState gameState = sessionDriven && adapter != null ? adapter.GameState : null;
+            if (gameState == null && CampaignDirector.Instance != null) gameState = localState ?? (localState = new BallPitSession.BallPitGameState());
             core = new GameplayCore(economyConfig, upgradeCatalog, gameState);
             core.DevToolsUsed |= controller.DevToolsUsedInSession;
             core.PeakPlayers = Mathf.Max(core.PeakPlayers, PlayerAvatar.All.Count);
@@ -111,7 +115,7 @@ namespace BallPitGameplay
             // Host-only: deposit/reject/return/win driver, save participant, capability application on purchase.
             if (isHost)
             {
-                depositDriver = new DepositDriver(controller, core, attribution, () => controller.ActiveSite as PitSite, OnWinHost);
+                depositDriver = new DepositDriver(controller, core, attribution, () => controller.ActiveSite as PitSite, OnPitDrainedHost);
                 controller.AddStepListener(depositDriver, PitStepOrder.ColliderSources);
                 core.UpgradePurchased += OnUpgradePurchasedHost;
                 core.BallSold += OnSaleHost;
@@ -278,6 +282,15 @@ namespace BallPitGameplay
         }
 
         private void OnDevToolUsed(int holder) { if (core != null) core.DevToolsUsed = true; }
+
+        // Deliverable D: with a campaign, a drained pit advances unless it is the last; with no director this is exactly OnWinHost
+        // (the director is resolved LAZILY at drain time, so scene Awake order never matters).
+        private void OnPitDrainedHost()
+        {
+            CampaignDirector dir = CampaignDirector.Instance;
+            if (dir != null && dir.HasMorePits) dir.OnActivePitDrained();
+            else OnWinHost();
+        }
 
         private void OnWinHost()
         {
