@@ -393,6 +393,34 @@ Automation IS in scope (it's the end-game power fantasy for the huge pits and th
   several authored pit configs, not several venues. Run `Tools/Ball Pit/Validate Venue`
   after authoring — it warns (doesn't force) about unfit walls, intrusions, etc.
 
+## 8b. VENUE SCALE — the factory is built for the FINALE [DECIDED intent; numbers are ESTIMATES]
+
+**Read this before sizing anything.** An earlier session sized the warehouse (28 x 20 m)
+to a ~4,000-ball pit that only existed in a render prompt. That was wrong. The venue is
+a full-scale factory built around the final ~1M-ball pit.
+
+- **Units.** Profile `pitX/pitY/pitZ` are BALL COUNTS, not meters. At 0.5 m balls, one
+  unit is ~0.5 m in X, ~0.433 m in Z, ~0.408 m per layer in Y (`PitWorld.FccGeometry`).
+  The shipped Random fill is ~58% dense, so budget **~0.113 m3 of pit per ball**
+  (depth = balls x 0.113 / footprint area).
+- **Depth grows with ball count unless the footprint grows.** Estimates:
+  kiddie 200 balls ~5x4 m; ~4k balls 20x12 m ~2 m deep; built-in `small` 40k ~20x17 m
+  ~11 m deep; built-in `large` 384k ~40x35 m ~32 m deep (a canyon); built-in `huge` 1M
+  at 50x43 m ~54 m deep. A 1M pit authored WIDE and SHALLOW is ~100x100 m, ~12 m deep.
+  A million balls is a football-field-sized hole whichever way it is cut.
+- **Warehouse floor = largest pit footprint + ~6 m sort band on the container sides +
+  2-3 m walking lanes.** For a ~100x100 m finale pit that is roughly a 125 m-class hall.
+  Size it to the finale, not the first pit.
+- **[OPEN — needs an owner call, do NOT assume]:** how small early pits (kiddie pool,
+  shipping container, ~4k) sit inside a hall sized for the finale without feeling lost:
+  partitioned bays, a hall that opens up between shipments, or something else. This also
+  decides whether containers/spawns are permanent furniture across the whole hall.
+- **Pit depth is a design knob, not a given.** Pick each pit's footprint:depth ratio on
+  purpose (a 30 m deep pit is not climbable or readable). Use the sizing table in
+  `docs/direction/CAMPAIGN-SCENE-SETUP.md` Step 2.
+- Numbers above are estimates from the fill math; verify against `Tools/Ball Pit/
+  Validate Venue` output (it prints interior size and fill tops) before building art.
+
 ## 9. Structure reuse of the venue/site system (CHOSEN — see §1b)
 
 - The shipment run reuses the venue/site system directly:
